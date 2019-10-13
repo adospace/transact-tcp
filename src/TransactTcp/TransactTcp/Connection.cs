@@ -36,7 +36,7 @@ namespace TransactTcp
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null)
         {
-            _endPoint = endPoint;
+            _endPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
             _receivedAction = receivedAction ?? throw new ArgumentNullException(nameof(receivedAction));
             _receivedActionAsync = receivedActionAsync;
             _connectionSettings = connectionSettings ?? ConnectionSettings.Default;

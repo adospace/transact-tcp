@@ -1,7 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Version Condition=" '$(APPVEYOR_BUILD_VERSION)' == '' ">0.0.1-local</Version>
+    <Version Condition=" '$(APPVEYOR_BUILD_VERSION)' != '' ">$(APPVEYOR_BUILD_VERSION)-beta</Version>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <Authors>adospace</Authors>
+    <Description>TransactTcp is a tcp communication library that allows thread-safe message-based communication between two tcp sockets. It supports automatic reconnection between peers and keep alive manamgement.</Description>
+    <Copyright>Adolfo Marinucci</Copyright>
+    <PackageTags>tcp async thread-safe peer</PackageTags>
+    <PackageProjectUrl>https://github.com/adospace/transact-tcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/adospace/transact-tcp</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
