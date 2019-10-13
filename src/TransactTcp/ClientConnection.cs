@@ -40,31 +40,38 @@ namespace TransactTcp
             _tcpClient = _localEndPoint == null ? new TcpClient() : new TcpClient(_localEndPoint);
             var cancellationCompletionSource = new TaskCompletionSource<bool>();
 
-            while (true)
+            using (var reconnectionDelayEvent = new AutoResetEvent(false))
             {
-                try
-                { 
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    var connectTask = _tcpClient.ConnectAsync(_endPoint.Address, _endPoint.Port);
-
-                    using (cancellationToken.Register(() => cancellationCompletionSource.TrySetResult(true)))
-                    {
-                        if (connectTask != await Task.WhenAny(connectTask, cancellationCompletionSource.Task))
-                        {
-                            throw new OperationCanceledException(cancellationToken);
-                        }
-                    }
-
-                    break;
-                }
-                catch (OperationCanceledException)
+                while (true)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-                catch (Exception ex)
-                { 
-                
+                    try
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        var connectTask = _tcpClient.ConnectAsync(_endPoint.Address, _endPoint.Port);
+
+                        using (cancellationToken.Register(() =>
+                        {
+                            reconnectionDelayEvent.Set();
+                            cancellationCompletionSource.TrySetResult(true);
+                        }))
+                        {
+                            if (connectTask != await Task.WhenAny(connectTask, cancellationCompletionSource.Task))
+                            {
+                                throw new OperationCanceledException(cancellationToken);
+                            }
+                        }
+
+                        if (!connectTask.IsFaulted)
+                            break;
+
+                        if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelay))
+                            break;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
                 }
             }
         }

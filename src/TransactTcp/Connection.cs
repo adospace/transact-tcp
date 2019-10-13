@@ -15,7 +15,7 @@ namespace TransactTcp
         protected IPEndPoint _endPoint;
         protected Action<IConnection, byte[]> _receivedAction;
         private readonly Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
-        private readonly ConnectionSettings _connectionSettings;
+        protected readonly ConnectionSettings _connectionSettings;
         private CancellationTokenSource _connectCancellationTokenSource;
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
         private CancellationTokenSource _sendKeepAliveLoopCancellationTokenSource;
@@ -273,8 +273,23 @@ namespace TransactTcp
 
         public  async Task SendDataAsync(byte[] data)
         {
-            _sendKeepAliveResetEvent.Set();
-            await _tcpClient.GetStream().WriteAsync(data, 0, data.Length);
+
+            if (_connectionStateMachine.State == ConnectionState.Connected && (_tcpClient?.Connected).GetValueOrDefault())
+            {
+                _sendKeepAliveResetEvent?.Set();
+
+                var lenInBytes = BitConverter.GetBytes(data.Length);
+
+                try
+                {
+                    await _tcpClient?.GetStream().WriteAsync(lenInBytes, 0, 4);
+                    await _tcpClient?.GetStream().WriteAsync(data, 0, data.Length);
+                }
+                catch (Exception)
+                {
+                    _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                }
+            }
         }
 
         public virtual void Start()
