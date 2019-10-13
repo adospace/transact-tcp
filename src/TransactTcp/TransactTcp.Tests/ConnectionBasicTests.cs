@@ -74,7 +74,7 @@ namespace TransactTcp.Tests
         public void CancelClientPendingConnectionShouldJustWork()
         {
             using var clientStateChangedEvent = new AutoResetEvent(false);
-            var client = ConnectionFactory.CreateClient(
+            using var client = ConnectionFactory.CreateClient(
                 IPAddress.Loopback,
                 15000,
                 (connection, data) => { },

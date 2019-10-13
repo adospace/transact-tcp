@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    public interface IConnection
+    public interface IConnection : IDisposable
     {
         void Start();
 

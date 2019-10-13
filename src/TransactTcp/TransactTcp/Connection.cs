@@ -24,6 +24,8 @@ namespace TransactTcp
         private AutoResetEvent _sendKeepAliveResetEvent;
         private Task _receiveLoopTask;
         private Task _sendKeepAliveLoopTask;
+        private AutoResetEvent _receiveLoopTaskIsRunningEvent;
+        private AutoResetEvent _sendKeepAliveTaskIsRunningEvent;
 
         private static readonly byte[] _keepAlivePacket = new byte[] { 0x0, 0x0, 0x0, 0x0 };
 
@@ -45,7 +47,11 @@ namespace TransactTcp
 
             _connectionStateMachine.Configure(ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
-                .OnEntryFrom(ConnectionTrigger.Disconnect, OnDisconnect);
+                .OnEntryFrom(ConnectionTrigger.Disconnect, ()=>
+                {
+                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Disconnected OnEntryFrom(ConnectionTrigger.Disconnect)");
+                    OnDisconnect();
+                });
 
             _connectionStateMachine.Configure(ConnectionState.Connecting)
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
@@ -59,22 +65,37 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
                 .OnEntry(() =>
                 {
-                    _receiveLoopTask = Task.Run(() => ReceiveLoopAsync());
-                    _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
+                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnEntry");
+                    using (_receiveLoopTaskIsRunningEvent = new AutoResetEvent(false))
+                    using (_sendKeepAliveTaskIsRunningEvent = new AutoResetEvent(false))
+                    {
+                        _receiveLoopTask = Task.Run(ReceiveLoopAsync);
+                        _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
+
+                        if (!_receiveLoopTaskIsRunningEvent.WaitOne())
+                            throw new InvalidOperationException();
+
+                        if (!_sendKeepAliveTaskIsRunningEvent.WaitOne())
+                            throw new InvalidOperationException();
+                    }
+
+                    _receiveLoopTaskIsRunningEvent = null;
+                    _sendKeepAliveTaskIsRunningEvent = null;
                 })
                 .OnExit(() =>
                 {
+                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnExit");
                     _receiveLoopCancellationTokenSource?.Cancel();
                     _sendKeepAliveLoopCancellationTokenSource?.Cancel();
                     _sendKeepAliveResetEvent?.Set();
-                    Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
                 });
 
             _connectionStateMachine.Configure(ConnectionState.LinkError)
                 .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
-                .OnEntry(() =>
+                .OnEntryFrom(ConnectionTrigger.LinkError, () =>
                 {
+                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.LinkError OnEntry");
                     OnDisconnect();
                     Task.Run(OnConnectAsyncCore);
                 });
@@ -82,11 +103,14 @@ namespace TransactTcp
 
         private void SendKeepAliveLoopAsync()
         {
+            System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Enter");
             try
             {
                 using (_sendKeepAliveResetEvent = new AutoResetEvent(false))
                 using (_sendKeepAliveLoopCancellationTokenSource = new CancellationTokenSource()) 
                 {
+                    _sendKeepAliveTaskIsRunningEvent.Set();
+
                     while (true)
                     {
                         if (!_sendKeepAliveResetEvent.WaitOne(_connectionSettings.KeepAliveMilliseconds))
@@ -95,7 +119,7 @@ namespace TransactTcp
 
                             ServiceRef.Call(this, async () =>
                             {
-                                if (_connectionStateMachine.State == ConnectionState.Connected)
+                                if (_connectionStateMachine.State == ConnectionState.Connected && (_tcpClient?.Connected).GetValueOrDefault())
                                 {
                                     await _tcpClient.GetStream().WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
                                 }
@@ -122,15 +146,19 @@ namespace TransactTcp
             {
                 _sendKeepAliveLoopCancellationTokenSource = null;
                 _sendKeepAliveResetEvent = null;
+                System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Exit");
             }
         }
 
-        private async void ReceiveLoopAsync()
+        private async Task ReceiveLoopAsync()
         {
+            System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Enter");
             try
             {
                 using (_receiveLoopCancellationTokenSource = new CancellationTokenSource())
                 {
+                    _receiveLoopTaskIsRunningEvent.Set();
+
                     var messageSizeBuffer = new byte[4];
                     var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                     while (true)
@@ -173,17 +201,31 @@ namespace TransactTcp
             finally
             {
                 _receiveLoopCancellationTokenSource = null;
+
+                System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Exit");
             }
         }
 
         private void OnDisconnect()
         {
-            System.Diagnostics.Debug.Assert(_receiveLoopCancellationTokenSource == null);
+            System.Diagnostics.Debug.WriteLine($"{GetType()}: OnDisconnect");
+
+            if (_receiveLoopTask != null)
+            {
+                Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
+                System.Diagnostics.Debug.Assert(_receiveLoopCancellationTokenSource == null);
+                System.Diagnostics.Debug.Assert(_sendKeepAliveLoopCancellationTokenSource == null);
+                _receiveLoopTask.Dispose();
+                _sendKeepAliveLoopTask.Dispose();
+                _receiveLoopTask = null;
+                _sendKeepAliveLoopTask = null;
+            }
+
             _tcpClient?.Close();
             _tcpClient = null;
         }
 
-        private async void OnConnectAsyncCore()
+        private async Task OnConnectAsyncCore()
         {
             try
             {
@@ -242,7 +284,44 @@ namespace TransactTcp
 
         public virtual void Stop()
         {
-            _connectionStateMachine.Fire(ConnectionTrigger.Disconnect);
+            if (_connectionStateMachine.State != ConnectionState.Disconnected)
+                _connectionStateMachine.Fire(ConnectionTrigger.Disconnect);
         }
+
+        #region IDisposable Support
+        private bool _disposedValue = false; // To detect redundant calls
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposedValue)
+            {
+                if (disposing)
+                {
+                    Stop();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
+                // TODO: set large fields to null.
+
+                _disposedValue = true;
+            }
+        }
+
+        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
+        // ~Connection()
+        // {
+        //   // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+        //   Dispose(false);
+        // }
+
+        // This code added to correctly implement the disposable pattern.
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
+            Dispose(true);
+            // TODO: uncomment the following line if the finalizer is overridden above.
+            // GC.SuppressFinalize(this);
+        }
+        #endregion
     }
 }

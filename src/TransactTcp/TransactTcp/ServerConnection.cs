@@ -54,6 +54,10 @@ namespace TransactTcp
                     cancellationToken.ThrowIfCancellationRequested();
                     throw;
                 }
+                finally
+                {
+                    tcpListener.Stop();
+                }
             }
         }
 
