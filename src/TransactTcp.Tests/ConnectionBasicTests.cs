@@ -19,7 +19,7 @@ namespace TransactTcp.Tests
                 (connection, data) => { },
                 connectionStateChangedAction: (connection, fromState, toState) =>
                 {
-                    if (toState == ConnectionState.Connected)
+                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
                         serverStateChangedEvent.Set();
                 });
 
@@ -29,7 +29,7 @@ namespace TransactTcp.Tests
                 (connection, data) => { }, 
                 connectionStateChangedAction: (connection, fromState, toState) => 
                 {
-                    if (toState == ConnectionState.Connected)
+                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
                         clientStateChangedEvent.Set();
                 });
 
@@ -44,6 +44,9 @@ namespace TransactTcp.Tests
 
             server.Stop();
             client.Stop();
+
+            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 
             server.State.ShouldBe(ConnectionState.Disconnected);
             client.State.ShouldBe(ConnectionState.Disconnected);
@@ -103,7 +106,7 @@ namespace TransactTcp.Tests
                 (connection, data) => { },
                 connectionStateChangedAction: (connection, fromState, toState) =>
                 {
-                    if (toState == ConnectionState.Connected)
+                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
                         serverStateChangedEvent.Set();
                 });
 
@@ -113,7 +116,7 @@ namespace TransactTcp.Tests
                 (connection, data) => { },
                 connectionStateChangedAction: (connection, fromState, toState) =>
                 {
-                    if (toState == ConnectionState.Connected)
+                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
                         clientStateChangedEvent.Set();
                 });
 
@@ -128,6 +131,9 @@ namespace TransactTcp.Tests
 
             server.Stop();
             client.Stop();
+
+            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 
             server.State.ShouldBe(ConnectionState.Disconnected);
             client.State.ShouldBe(ConnectionState.Disconnected);
@@ -182,6 +188,9 @@ namespace TransactTcp.Tests
 
             server.Stop();
             client.Stop();
+
+            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 
             server.State.ShouldBe(ConnectionState.Disconnected);
             client.State.ShouldBe(ConnectionState.Disconnected);
