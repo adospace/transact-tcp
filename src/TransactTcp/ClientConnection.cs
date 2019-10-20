@@ -18,7 +18,7 @@ namespace TransactTcp
             IPEndPoint localEndPoint = null, 
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null) 
-            : base(endPoint, receivedAction, null, connectionStateChangedAction, connectionSettings)
+            : base(endPoint, receivedAction, null, null, connectionStateChangedAction, connectionSettings)
         {
             _localEndPoint = localEndPoint;
         }
@@ -29,11 +29,21 @@ namespace TransactTcp
             IPEndPoint localEndPoint = null,
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null)
-            : base(endPoint, null, receivedActionAsync, connectionStateChangedAction, connectionSettings)
+            : base(endPoint, null, receivedActionAsync, null, connectionStateChangedAction, connectionSettings)
         {
             _localEndPoint = localEndPoint;
         }
 
+        public ClientConnection(
+            IPEndPoint endPoint,
+            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync,
+            IPEndPoint localEndPoint = null,
+            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
+            ConnectionSettings connectionSettings = null)
+            : base(endPoint, null, null, receivedActionStreamAsync, connectionStateChangedAction, connectionSettings)
+        {
+            _localEndPoint = localEndPoint;
+        }
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {

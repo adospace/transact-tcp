@@ -15,6 +15,7 @@ namespace TransactTcp
         protected IPEndPoint _endPoint;
         protected Action<IConnection, byte[]> _receivedAction;
         private readonly Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
+        private readonly Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> _receivedActionStreamAsync;
         protected readonly ConnectionSettings _connectionSettings;
         private CancellationTokenSource _connectCancellationTokenSource;
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
@@ -33,12 +34,19 @@ namespace TransactTcp
             IPEndPoint endPoint,
             Action<IConnection, byte[]> receivedAction,
             Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync,
+            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync,
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null)
         {
+            if (receivedAction == null && receivedActionAsync == null && receivedActionStreamAsync == null)
+            {
+                throw new ArgumentNullException(nameof(receivedAction));
+            }
+
             _endPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
-            _receivedAction = receivedAction ?? throw new ArgumentNullException(nameof(receivedAction));
+            _receivedAction = receivedAction;
             _receivedActionAsync = receivedActionAsync;
+            _receivedActionStreamAsync = receivedActionStreamAsync;
             _connectionSettings = connectionSettings ?? ConnectionSettings.Default;
             _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
@@ -174,15 +182,25 @@ namespace TransactTcp
                         if (messageLength == 0)
                             continue;
 
-                        var messageBuffer = new byte[messageLength];
-                        await _tcpClient.GetStream().ReadBufferedAsync(messageBuffer, cancellationToken);
-
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        if (_receivedActionAsync != null)
-                            await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
+                        if (_receivedActionStreamAsync != null)
+                        {
+                            var bufferedStream = new NetworkBufferedReadStream(_tcpClient.GetStream(), messageLength);
+                            await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
+                            await bufferedStream.FlushAsync();
+                        }
                         else
-                            _receivedAction(refToThis, messageBuffer);
+                        {
+                            var messageBuffer = new byte[messageLength];
+                            
+                            await _tcpClient.GetStream().ReadBufferedAsync(messageBuffer, cancellationToken);
+
+                            if (_receivedActionAsync != null)
+                                await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
+                            else
+                                _receivedAction(refToThis, messageBuffer);
+                        }
                     }
                 }
             }
