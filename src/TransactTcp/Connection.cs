@@ -153,6 +153,9 @@ namespace TransactTcp
         private async Task ReceiveLoopAsync()
         {
             System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Enter");
+#pragma warning disable IDE0068 // Use recommended dispose pattern
+            var refToThis = ServiceRef.Create<IConnection>(this);
+#pragma warning restore IDE0068 // Use recommended dispose pattern
             try
             {
                 using (_receiveLoopCancellationTokenSource = new CancellationTokenSource())
@@ -163,8 +166,7 @@ namespace TransactTcp
                     var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                     while (true)
                     {
-                        if (await _tcpClient.GetStream().ReadAsync(messageSizeBuffer, 0, 4, cancellationToken) < 4)
-                            throw new TimeoutException();
+                        await _tcpClient.GetStream().ReadBufferedAsync(messageSizeBuffer, cancellationToken);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -173,15 +175,14 @@ namespace TransactTcp
                             continue;
 
                         var messageBuffer = new byte[messageLength];
-                        if (await _tcpClient.GetStream().ReadAsync(messageBuffer, 0, messageLength, cancellationToken) < messageLength)
-                            throw new TimeoutException();
+                        await _tcpClient.GetStream().ReadBufferedAsync(messageBuffer, cancellationToken);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
                         if (_receivedActionAsync != null)
-                            await _receivedActionAsync(ServiceRef.Create<IConnection>(this), messageBuffer, cancellationToken);
+                            await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
                         else
-                            _receivedAction(ServiceRef.Create<IConnection>(this), messageBuffer);
+                            _receivedAction(refToThis, messageBuffer);
                     }
                 }
             }
