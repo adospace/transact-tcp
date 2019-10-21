@@ -13,6 +13,7 @@
     <PackageProjectUrl>https://github.com/adospace/transact-tcp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/adospace/transact-tcp</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
