@@ -12,31 +12,12 @@ namespace TransactTcp
     {
         public ServerConnection(
             IPEndPoint endPoint, 
-            Action<IConnection, byte[]> receivedAction, 
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null) 
-            : base(endPoint, receivedAction, null, null, connectionStateChangedAction, connectionSettings)
+            : base(endPoint, connectionSettings)
         {
         }
 
-        public ServerConnection(
-            IPEndPoint endPoint,
-            Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync,
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
-            ConnectionSettings connectionSettings = null)
-            : base(endPoint, null, receivedActionAsync, null, connectionStateChangedAction, connectionSettings)
-        {
-        }
-
-        public ServerConnection(
-            IPEndPoint endPoint,
-            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync,
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
-            ConnectionSettings connectionSettings = null)
-            : base(endPoint, null, null, receivedActionStreamAsync, connectionStateChangedAction, connectionSettings)
-        {
-        }
-        
+       
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
             var tcpListener = new TcpListener(_endPoint);

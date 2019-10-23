@@ -27,17 +27,21 @@ namespace TransactTcp.Demo
 
         private static void RunServer()
         {
-            using var server = ConnectionFactory.CreateServer(15000,
-                (connection, data) => Console.WriteLine($"Message from client: {Encoding.UTF8.GetString(data)}"),
-                (connection, fromState, toState) => Console.WriteLine($"Server connection state changed from {fromState} to {toState}"));
+            using var server = ConnectionFactory.CreateServer(15000);
+
+            server.Start(
+                receivedAction: (connection, data) => Console.WriteLine($"Message from client: {Encoding.UTF8.GetString(data)}"),
+                connectionStateChangedAction: (connection, fromState, toState) => Console.WriteLine($"Server connection state changed from {fromState} to {toState}"));
 
             RunConnection(server);
         }
 
         private static void RunClient()
         {
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000,
-                (connection, data) => Console.WriteLine($"Message from server: {Encoding.UTF8.GetString(data)}"),
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+
+            client.Start(
+                receivedAction: (connection, data) => Console.WriteLine($"Message from server: {Encoding.UTF8.GetString(data)}"),
                 connectionStateChangedAction: (connection, fromState, toState) => Console.WriteLine($"Client connection state changed from {fromState} to {toState}"));
 
             RunConnection(client);
@@ -45,8 +49,6 @@ namespace TransactTcp.Demo
 
         private static void RunConnection(IConnection connection)
         {
-            connection.Start();
-
             while (true)
             {
                 var message = Console.ReadLine();

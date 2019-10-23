@@ -14,27 +14,21 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = ConnectionFactory.CreateServer(
-                15000, 
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        serverStateChangedEvent.Set();
-                });
+            var server = ConnectionFactory.CreateServer(15000);
 
-            var client = ConnectionFactory.CreateClient(
-                IPAddress.Loopback, 
-                15000, 
-                (connection, data) => { }, 
-                connectionStateChangedAction: (connection, fromState, toState) => 
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        clientStateChangedEvent.Set();
-                });
+            var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
-            server.Start();
-            client.Start();
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    serverStateChangedEvent.Set();
+            });
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    clientStateChangedEvent.Set();
+            });
 
             serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
             clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
@@ -56,16 +50,13 @@ namespace TransactTcp.Tests
         public void CancelServerPendingConnectionShouldJustWork()
         {
             using var serverStateChangedEvent = new AutoResetEvent(false);
-            var server = ConnectionFactory.CreateServer(
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Disconnected)
-                        serverStateChangedEvent.Set();
-                });
+            var server = ConnectionFactory.CreateServer(15000);
 
-            server.Start();
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Disconnected)
+                    serverStateChangedEvent.Set();
+            });
 
             server.Stop();
 
@@ -77,17 +68,13 @@ namespace TransactTcp.Tests
         public void CancelClientPendingConnectionShouldJustWork()
         {
             using var clientStateChangedEvent = new AutoResetEvent(false);
-            using var client = ConnectionFactory.CreateClient(
-                IPAddress.Loopback,
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Disconnected)
-                        clientStateChangedEvent.Set();
-                });
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
-            client.Start();
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Disconnected)
+                    clientStateChangedEvent.Set();
+            });
 
             client.Stop();
 
@@ -102,27 +89,24 @@ namespace TransactTcp.Tests
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
             var server = ConnectionFactory.CreateServer(
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        serverStateChangedEvent.Set();
-                });
+                15000);
 
             var client = ConnectionFactory.CreateClient(
                 IPAddress.Loopback,
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        clientStateChangedEvent.Set();
-                });
+                15000);
 
-            client.Start();
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    clientStateChangedEvent.Set();
+            });
 
-            server.Start();
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    serverStateChangedEvent.Set();
+            });
+
             clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
             serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 
@@ -145,27 +129,21 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = ConnectionFactory.CreateServer(
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        serverStateChangedEvent.Set();
-                });
+            var server = ConnectionFactory.CreateServer(15000);
 
-            var client = ConnectionFactory.CreateClient(
-                IPAddress.Loopback,
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        clientStateChangedEvent.Set();
-                });
+            var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
-            server.Start();
-            client.Start();
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    serverStateChangedEvent.Set();
+            });
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    clientStateChangedEvent.Set();
+            });
 
             serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
             clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();

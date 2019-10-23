@@ -2,6 +2,7 @@
 using Stateless;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -13,9 +14,11 @@ namespace TransactTcp
     internal abstract class Connection : IConnection
     {
         protected IPEndPoint _endPoint;
-        protected Action<IConnection, byte[]> _receivedAction;
-        private readonly Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
-        private readonly Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> _receivedActionStreamAsync;
+        private Action<IConnection, byte[]> _receivedAction;
+        private Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
+        private Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> _receivedActionStreamAsync;
+        private Action<IConnection, ConnectionState, ConnectionState> _connectionStateChangedAction;
+
         protected readonly ConnectionSettings _connectionSettings;
         private CancellationTokenSource _connectCancellationTokenSource;
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
@@ -32,26 +35,14 @@ namespace TransactTcp
 
         protected Connection(
             IPEndPoint endPoint,
-            Action<IConnection, byte[]> receivedAction,
-            Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync,
-            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync,
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null)
         {
-            if (receivedAction == null && receivedActionAsync == null && receivedActionStreamAsync == null)
-            {
-                throw new ArgumentNullException(nameof(receivedAction));
-            }
-
             _endPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
-            _receivedAction = receivedAction;
-            _receivedActionAsync = receivedActionAsync;
-            _receivedActionStreamAsync = receivedActionStreamAsync;
             _connectionSettings = connectionSettings ?? ConnectionSettings.Default;
             _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
             _connectionStateMachine.OnTransitioned((transition) => 
-                connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination));
+                _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination));
 
             _connectionStateMachine.Configure(ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
@@ -198,7 +189,7 @@ namespace TransactTcp
 
                             if (_receivedActionAsync != null)
                                 await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
-                            else
+                            else if (_receivedAction != null)
                                 _receivedAction(refToThis, messageBuffer);
                         }
                     }
@@ -311,8 +302,22 @@ namespace TransactTcp
             }
         }
 
-        public virtual void Start()
+        public virtual void Start(Action<IConnection, byte[]> receivedAction = null,
+            Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null,
+            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync = null,
+            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null)
         {
+            _receivedAction = receivedAction ?? _receivedAction;
+            _receivedActionAsync = receivedActionAsync ?? _receivedActionAsync;
+            _receivedActionStreamAsync = receivedActionStreamAsync ?? _receivedActionStreamAsync;
+
+            if (new [] { _receivedAction != null, _receivedActionAsync != null, _receivedActionStreamAsync != null }
+                .Count(_=>_) > 1)
+            {
+                throw new InvalidOperationException("No more than one received action can be specified");
+            }
+
+            _connectionStateChangedAction = connectionStateChangedAction ?? _connectionStateChangedAction;
             _connectionStateMachine.Fire(ConnectionTrigger.Connect);
         }
 
@@ -332,6 +337,10 @@ namespace TransactTcp
                 if (disposing)
                 {
                     Stop();
+                    _connectCancellationTokenSource?.Dispose();
+                    _sendKeepAliveLoopCancellationTokenSource?.Dispose();
+                    _receiveLoopCancellationTokenSource?.Dispose();
+                    _sendKeepAliveResetEvent?.Dispose();
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.

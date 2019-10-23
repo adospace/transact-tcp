@@ -9,68 +9,26 @@ namespace TransactTcp
 {
     public static class ConnectionFactory
     {
-        public static IConnection CreateServer(IPEndPoint remoteEndPoint, Action<IConnection, byte[]> receivedDataAction, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null) 
-            => ServiceActor.ServiceRef.Create<IConnection>(new ServerConnection(remoteEndPoint, receivedDataAction, connectionStateChangedAction));
+        public static IConnection CreateServer(IPEndPoint remoteEndPoint, ConnectionSettings connectionSettings = null) 
+            => ServiceActor.ServiceRef.Create<IConnection>(new ServerConnection(remoteEndPoint, connectionSettings));
 
-        public static IConnection CreateServer(int port, Action<IConnection, byte[]> receivedDataAction, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(IPAddress.Any, port), receivedDataAction, connectionStateChangedAction);
+        public static IConnection CreateServer(int port, ConnectionSettings connectionSettings = null)
+            => CreateServer(new IPEndPoint(IPAddress.Any, port), connectionSettings);
 
-        public static IConnection CreateServer(string localIp, int port, Action<IConnection, byte[]> receivedDataAction, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(IPAddress.Parse(localIp), port), receivedDataAction, connectionStateChangedAction);
+        public static IConnection CreateServer(string localIp, int port, ConnectionSettings connectionSettings = null)
+            => CreateServer(new IPEndPoint(IPAddress.Parse(localIp), port), connectionSettings);
 
-        public static IConnection CreateServer(IPAddress localIp, int port, Action<IConnection, byte[]> receivedDataAction, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(localIp, port), receivedDataAction, connectionStateChangedAction);
+        public static IConnection CreateServer(IPAddress localIp, int port, Action<IConnection, byte[]> receivedDataAction = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
+            => CreateServer(new IPEndPoint(localIp, port), connectionSettings);
 
-        public static IConnection CreateServer(IPEndPoint remoteEndPoint, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => ServiceActor.ServiceRef.Create<IConnection>(new ServerConnection(remoteEndPoint, receivedDataActionAsync, connectionStateChangedAction));
+        public static IConnection CreateClient(IPEndPoint remoteEndPoint, IPEndPoint localEndPoint = null, ConnectionSettings connectionSettings = null)
+            => ServiceActor.ServiceRef.Create<IConnection>(new ClientConnection(remoteEndPoint, localEndPoint, connectionSettings));
 
-        public static IConnection CreateServer(int port, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(IPAddress.Any, port), receivedDataActionAsync, connectionStateChangedAction);
+        public static IConnection CreateClient(string remoteIp, int port, IPEndPoint localEndPoint = null, ConnectionSettings connectionSettings = null)
+            => CreateClient(new IPEndPoint(IPAddress.Parse(remoteIp), port), localEndPoint, connectionSettings);
 
-        public static IConnection CreateServer(string localIp, int port, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(IPAddress.Parse(localIp), port), receivedDataActionAsync, connectionStateChangedAction);
-
-        public static IConnection CreateServer(IPAddress localIp, int port, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(localIp, port), receivedDataActionAsync, connectionStateChangedAction);
-
-        public static IConnection CreateServer(IPEndPoint remoteEndPoint, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => ServiceActor.ServiceRef.Create<IConnection>(new ServerConnection(remoteEndPoint, receivedStreamActionAsync, connectionStateChangedAction));
-
-        public static IConnection CreateServer(int port, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(IPAddress.Any, port), receivedStreamActionAsync, connectionStateChangedAction);
-
-        public static IConnection CreateServer(string localIp, int port, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(IPAddress.Parse(localIp), port), receivedStreamActionAsync, connectionStateChangedAction);
-
-        public static IConnection CreateServer(IPAddress localIp, int port, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateServer(new IPEndPoint(localIp, port), receivedStreamActionAsync, connectionStateChangedAction);
-
-        public static IConnection CreateClient(IPEndPoint remoteEndPoint, Action<IConnection, byte[]> receivedAction, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => ServiceActor.ServiceRef.Create<IConnection>(new ClientConnection(remoteEndPoint, receivedAction, localEndPoint, connectionStateChangedAction));
-
-        public static IConnection CreateClient(string remoteIp, int port, Action<IConnection, byte[]> receivedAction, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateClient(new IPEndPoint(IPAddress.Parse(remoteIp), port), receivedAction, localEndPoint, connectionStateChangedAction);
-
-        public static IConnection CreateClient(IPAddress remoteIp, int port, Action<IConnection, byte[]> receivedAction, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateClient(new IPEndPoint(remoteIp, port), receivedAction, localEndPoint, connectionStateChangedAction);
-
-        public static IConnection CreateClient(IPEndPoint remoteEndPoint, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => ServiceActor.ServiceRef.Create<IConnection>(new ClientConnection(remoteEndPoint, receivedDataActionAsync, localEndPoint, connectionStateChangedAction));
-
-        public static IConnection CreateClient(string remoteIp, int port, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateClient(new IPEndPoint(IPAddress.Parse(remoteIp), port), receivedDataActionAsync, localEndPoint, connectionStateChangedAction);
-
-        public static IConnection CreateClient(IPAddress remoteIp, int port, Func<IConnection, byte[], CancellationToken, Task> receivedDataActionAsync, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateClient(new IPEndPoint(remoteIp, port), receivedDataActionAsync, localEndPoint, connectionStateChangedAction);
-
-        public static IConnection CreateClient(IPEndPoint remoteEndPoint, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => ServiceActor.ServiceRef.Create<IConnection>(new ClientConnection(remoteEndPoint, receivedStreamActionAsync, localEndPoint, connectionStateChangedAction));
-
-        public static IConnection CreateClient(string remoteIp, int port, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateClient(new IPEndPoint(IPAddress.Parse(remoteIp), port), receivedStreamActionAsync, localEndPoint, connectionStateChangedAction);
-
-        public static IConnection CreateClient(IPAddress remoteIp, int port, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedStreamActionAsync, IPEndPoint localEndPoint = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null, ConnectionSettings connectionSettings = null)
-            => CreateClient(new IPEndPoint(remoteIp, port), receivedStreamActionAsync, localEndPoint, connectionStateChangedAction);
+        public static IConnection CreateClient(IPAddress remoteIp, int port, IPEndPoint localEndPoint = null, ConnectionSettings connectionSettings = null)
+            => CreateClient(new IPEndPoint(remoteIp, port), localEndPoint, connectionSettings);
 
     }
 }

@@ -19,32 +19,28 @@ namespace TransactTcp.Tests
 
             const int messageSize = 1024 * 128; //128kb
 
-            using var server = ConnectionFactory.CreateServer(
-                15000,
-                (connection, data) => 
-                {
-                    Assert.AreEqual(messageSize, data.Length);
-                    serverReceivedDataEvent.Set(); 
-                },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        serverStateChangedEvent.Set();
-                });
+            using var server = ConnectionFactory.CreateServer(15000);
 
-            using var client = ConnectionFactory.CreateClient(
-                IPAddress.Loopback,
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        clientStateChangedEvent.Set();
-                });
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
-            client.Start();
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    clientStateChangedEvent.Set();
+            });
 
-            server.Start();
+            server.Start((connection, data) =>
+            {
+                Assert.AreEqual(messageSize, data.Length);
+                serverReceivedDataEvent.Set();
+            },
+            
+            connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    serverStateChangedEvent.Set();
+            });
+
             clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
             serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 
@@ -64,33 +60,30 @@ namespace TransactTcp.Tests
 
             int currentMessageSize = -1;
 
-            using var server = ConnectionFactory.CreateServer(
-                15000,
-                receivedStreamActionAsync: async (connection, stream, cancellationToken) => 
-                {
-                    var bytesRead = await stream.ReadAsync(new byte[stream.Length], 0, (int)stream.Length, cancellationToken);
-                    Assert.AreEqual(currentMessageSize, bytesRead);
-                    serverReceivedDataEvent.Set();
-                },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        serverStateChangedEvent.Set();
-                });
+            using var server = ConnectionFactory.CreateServer(15000                );
 
             using var client = ConnectionFactory.CreateClient(
                 IPAddress.Loopback,
-                15000,
-                (connection, data) => { },
-                connectionStateChangedAction: (connection, fromState, toState) =>
-                {
-                    if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                        clientStateChangedEvent.Set();
-                });
+                15000);
 
-            client.Start();
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    clientStateChangedEvent.Set();
+            });
 
-            server.Start();
+            server.Start(receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+            {
+                var bytesRead = await stream.ReadAsync(new byte[stream.Length], 0, (int)stream.Length, cancellationToken);
+                Assert.AreEqual(currentMessageSize, bytesRead);
+                serverReceivedDataEvent.Set();
+            },
+            connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    serverStateChangedEvent.Set();
+            });
+
             clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
             serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 

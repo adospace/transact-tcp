@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    internal static class Extensions
+    public static class Extensions
     {
-        public static Task ReadBufferedAsync(this NetworkStream networkStream, byte[] buffer, CancellationToken cancellationToken) 
+        internal static Task ReadBufferedAsync(this NetworkStream networkStream, byte[] buffer, CancellationToken cancellationToken) 
             => ReadBufferedAsync(networkStream, buffer, 0, buffer.Length, cancellationToken);
 
-        public static async Task ReadBufferedAsync(this NetworkStream networkStream, byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        internal static async Task ReadBufferedAsync(this NetworkStream networkStream, byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             if (networkStream is null)
             {
@@ -32,7 +32,7 @@ namespace TransactTcp
             }
         }
 
-        public static void ReadBuffered(this NetworkStream networkStream, byte[] buffer, int offset, int count)
+        internal static void ReadBuffered(this NetworkStream networkStream, byte[] buffer, int offset, int count)
         {
             if (networkStream is null)
             {
@@ -51,5 +51,14 @@ namespace TransactTcp
                 count -= bytesRead;
             }
         }
+
+        public static void Start(this IConnection connection, Action<IConnection, byte[]> receivedAction)
+            => connection.Start(receivedAction: receivedAction);
+
+        public static void Start(this IConnection connection, Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync)
+            => connection.Start(receivedActionAsync: receivedActionAsync);
+
+        public static void Start(this IConnection connection, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync)
+            => connection.Start(receivedActionStreamAsync: receivedActionStreamAsync);
     }
 }

@@ -14,33 +14,9 @@ namespace TransactTcp
 
         public ClientConnection(
             IPEndPoint endPoint,
-            Action<IConnection, byte[]> receivedAction, 
             IPEndPoint localEndPoint = null, 
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
             ConnectionSettings connectionSettings = null) 
-            : base(endPoint, receivedAction, null, null, connectionStateChangedAction, connectionSettings)
-        {
-            _localEndPoint = localEndPoint;
-        }
-
-        public ClientConnection(
-            IPEndPoint endPoint,
-            Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync,
-            IPEndPoint localEndPoint = null,
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
-            ConnectionSettings connectionSettings = null)
-            : base(endPoint, null, receivedActionAsync, null, connectionStateChangedAction, connectionSettings)
-        {
-            _localEndPoint = localEndPoint;
-        }
-
-        public ClientConnection(
-            IPEndPoint endPoint,
-            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync,
-            IPEndPoint localEndPoint = null,
-            Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null,
-            ConnectionSettings connectionSettings = null)
-            : base(endPoint, null, null, receivedActionStreamAsync, connectionStateChangedAction, connectionSettings)
+            : base(endPoint, connectionSettings)
         {
             _localEndPoint = localEndPoint;
         }
