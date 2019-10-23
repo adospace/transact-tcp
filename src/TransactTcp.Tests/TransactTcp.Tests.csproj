@@ -7,11 +7,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\toxiproxy-server-windows-amd64.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\toxiproxy-server-windows-amd64.exe" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="1.4.0" />
     <PackageReference Include="MSTest.TestFramework" Version="1.4.0" />
     <PackageReference Include="coverlet.collector" Version="1.0.1" />
     <PackageReference Include="Shouldly" Version="3.0.2" />
+    <PackageReference Include="ToxiproxyNetCore" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>

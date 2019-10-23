@@ -38,7 +38,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
                 .OnEntryFrom(ConnectionTrigger.Disconnect, () =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Disconnected OnEntryFrom(ConnectionTrigger.Disconnect)");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Disconnected OnEntryFrom(ConnectionTrigger.Disconnect)");
                     StopChildConnections();
                 })
                 ;
@@ -49,7 +49,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
                 .OnEntry(() =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connecting OnEntry()");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connecting OnEntry()");
                     StartChildConnections();
                 })
                 ;
@@ -65,7 +65,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
                 .OnEntry(() =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.LinkError OnEntry");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.LinkError OnEntry");
                     _receivedMessageCounter = _sentMessageCounter = 0;
                     RestartChildConnections();
                 });
@@ -99,6 +99,8 @@ namespace TransactTcp
 
         private void OnChildChannelConnectionStateChanged(IConnection connection, ConnectionState fromState, ConnectionState toState)
         {
+            System.Diagnostics.Debug.WriteLine($"{connection.GetType()} connection state changed from {fromState} to {toState}");
+
             if (toState == ConnectionState.Connected)
                 //even if only one connection is connected I'm connected
                 _connectionStateMachine.Fire(ConnectionTrigger.Connected);
@@ -128,7 +130,7 @@ namespace TransactTcp
                 }
                 else
                 {
-                    var messageData = await networkStream.ReadBytesAsync((int)networkStream.Length);
+                    var messageData = await networkStream.ReadBytesAsync((int)networkStream.Length - 4/* messageCounter size */);
 
                     if (_receivedActionAsync != null)
                         await _receivedActionAsync(thisRef, messageData, cancellationToken);
@@ -167,8 +169,10 @@ namespace TransactTcp
 
                 foreach (var childConnection in _connections)
                 {
-                    await childConnection.SendDataAsync(BitConverter.GetBytes(_sentMessageCounter));
-                    await childConnection.SendDataAsync(data);
+                    var buffer = new byte[4 + data.Length];
+                    BitConverter.GetBytes(_sentMessageCounter).CopyTo(buffer, 0);
+                    data.CopyTo(buffer, 4);
+                    await childConnection.SendDataAsync(buffer);
                 }
             }
         }

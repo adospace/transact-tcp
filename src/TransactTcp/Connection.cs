@@ -48,7 +48,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
                 .OnEntryFrom(ConnectionTrigger.Disconnect, ()=>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Disconnected OnEntryFrom(ConnectionTrigger.Disconnect)");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Disconnected OnEntryFrom(ConnectionTrigger.Disconnect)");
                     OnDisconnect();
                 });
 
@@ -64,7 +64,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
                 .OnEntry(() =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnEntry");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnEntry");
                     using (_receiveLoopTaskIsRunningEvent = new AutoResetEvent(false))
                     using (_sendKeepAliveTaskIsRunningEvent = new AutoResetEvent(false))
                     {
@@ -83,7 +83,7 @@ namespace TransactTcp
                 })
                 .OnExit(() =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnExit");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnExit");
                     _receiveLoopCancellationTokenSource?.Cancel();
                     _sendKeepAliveLoopCancellationTokenSource?.Cancel();
                     _sendKeepAliveResetEvent?.Set();
@@ -94,7 +94,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
                 .OnEntryFrom(ConnectionTrigger.LinkError, () =>
                 {
-                    System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.LinkError OnEntry");
+                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.LinkError OnEntry");
                     OnDisconnect();
                     Task.Run(OnConnectAsyncCore);
                 });
@@ -102,7 +102,7 @@ namespace TransactTcp
 
         private void SendKeepAliveLoopAsync()
         {
-            System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Enter");
+            //System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Enter");
             try
             {
                 using (_sendKeepAliveResetEvent = new AutoResetEvent(false))
@@ -145,13 +145,13 @@ namespace TransactTcp
             {
                 _sendKeepAliveLoopCancellationTokenSource = null;
                 _sendKeepAliveResetEvent = null;
-                System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Exit");
+                //System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Exit");
             }
         }
 
         private async Task ReceiveLoopAsync()
         {
-            System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Enter");
+            ////System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Enter");
 #pragma warning disable IDE0068 // Use recommended dispose pattern
             var refToThis = ServiceRef.Create<IConnection>(this);
 #pragma warning restore IDE0068 // Use recommended dispose pattern
@@ -212,13 +212,13 @@ namespace TransactTcp
             {
                 _receiveLoopCancellationTokenSource = null;
 
-                System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Exit");
+                //System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Exit");
             }
         }
 
         private void OnDisconnect()
         {
-            System.Diagnostics.Debug.WriteLine($"{GetType()}: OnDisconnect");
+            //System.Diagnostics.Debug.WriteLine($"{GetType()}: OnDisconnect");
 
             if (_receiveLoopTask != null)
             {
