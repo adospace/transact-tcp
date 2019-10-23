@@ -283,7 +283,6 @@ namespace TransactTcp
 
         public  async Task SendDataAsync(byte[] data)
         {
-
             if (_connectionStateMachine.State == ConnectionState.Connected && (_tcpClient?.Connected).GetValueOrDefault())
             {
                 _sendKeepAliveResetEvent?.Set();
@@ -311,8 +310,7 @@ namespace TransactTcp
             _receivedActionAsync = receivedActionAsync ?? _receivedActionAsync;
             _receivedActionStreamAsync = receivedActionStreamAsync ?? _receivedActionStreamAsync;
 
-            if (new [] { _receivedAction != null, _receivedActionAsync != null, _receivedActionStreamAsync != null }
-                .Count(_=>_) > 1)
+            if (new [] { _receivedAction != null, _receivedActionAsync != null, _receivedActionStreamAsync != null }.Count(_=>_) > 1)
             {
                 throw new InvalidOperationException("No more than one received action can be specified");
             }
