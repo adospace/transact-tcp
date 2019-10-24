@@ -220,7 +220,7 @@ namespace TransactTcp.Tests
 
                 var latencyProxy = new LatencyToxic()
                 {
-                    Name = "latencyInterface2",
+                    Name = "latencyToxicInterface2",
                     Stream = ToxicDirection.DownStream,
                     Toxicity = 1.0,
                 };
@@ -228,6 +228,25 @@ namespace TransactTcp.Tests
                 latencyProxy.Attributes.Latency = 300;
 
                 await interface1Proxy.AddAsync(latencyProxy);
+
+                WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 2000).ShouldBeFalse();
+
+                var slicerToxic = new SlicerToxic()
+                {
+                    Name = "slicerToxicInterface1",
+                    Stream = ToxicDirection.UpStream,
+                    Toxicity = 1.0,
+                };
+                slicerToxic.Attributes.AverageSize = 10;
+                slicerToxic.Attributes.Delay = 5;
+                slicerToxic.Attributes.SizeVariation = 1;
+
+                await interface1Proxy.AddAsync(slicerToxic);
+
+                WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 4000).ShouldBeFalse();
+
+                interface2Proxy.Enabled = false;
+                await client.UpdateAsync(interface2Proxy);
 
                 WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 2000).ShouldBeFalse();
 
