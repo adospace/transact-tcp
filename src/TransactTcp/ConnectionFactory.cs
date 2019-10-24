@@ -26,6 +26,7 @@ namespace TransactTcp
         public static IConnection CreateServer(IPAddress localIp, int localPort, ConnectionSettings connectionSettings = null)
             => CreateServer(new IPEndPoint(localIp, localPort), connectionSettings);
 
+
         public static IConnection CreateClient(ConnectionEndPoint endPoint, IPEndPoint localEndPoint = null)
             => ServiceRef.Create<IConnection>(new ClientConnection(endPoint, localEndPoint));
 
@@ -38,6 +39,36 @@ namespace TransactTcp
         public static IConnection CreateClient(IPAddress remoteIp, int remotePort, IPEndPoint localEndPoint = null, ConnectionSettings connectionSettings = null)
             => CreateClient(new IPEndPoint(remoteIp, remotePort), localEndPoint, connectionSettings);
 
+
+        public static IConnection CreateSslServer(SslConnectionEndPoint connectionEndPoint)
+            => ServiceRef.Create<IConnection>(new SslServerConnection(connectionEndPoint));
+
+        public static IConnection CreateSslServer(IPEndPoint localEndPoint, SslConnectionSettings connectionSettings = null)
+            => CreateSslServer(new SslConnectionEndPoint(localEndPoint: localEndPoint, connectionSettings: connectionSettings));
+
+        public static IConnection CreateSslServer(int localPort, SslConnectionSettings connectionSettings = null)
+            => CreateSslServer(new IPEndPoint(IPAddress.Any, localPort), connectionSettings);
+
+        public static IConnection CreateSslServer(string localIp, int localPort, SslConnectionSettings connectionSettings = null)
+            => CreateSslServer(new IPEndPoint(IPAddress.Parse(localIp), localPort), connectionSettings);
+
+        public static IConnection CreateSslServer(IPAddress localIp, int localPort, SslConnectionSettings connectionSettings = null)
+            => CreateSslServer(new IPEndPoint(localIp, localPort), connectionSettings);
+
+
+        public static IConnection CreateSslClient(SslConnectionEndPoint endPoint, IPEndPoint localEndPoint = null)
+            => ServiceRef.Create<IConnection>(new SslClientConnection(endPoint, localEndPoint));
+
+        public static IConnection CreateSslClient(IPEndPoint remoteEndPoint, IPEndPoint localEndPoint = null, SslConnectionSettings connectionSettings = null)
+            => CreateSslClient(new SslConnectionEndPoint(remoteEndPoint: remoteEndPoint, connectionSettings: connectionSettings), localEndPoint);
+
+        public static IConnection CreateSslClient(string remoteIp, int remotePort, IPEndPoint localEndPoint = null, SslConnectionSettings connectionSettings = null)
+            => CreateSslClient(new IPEndPoint(IPAddress.Parse(remoteIp), remotePort), localEndPoint, connectionSettings);
+
+        public static IConnection CreateSslClient(IPAddress remoteIp, int remotePort, IPEndPoint localEndPoint = null, SslConnectionSettings connectionSettings = null)
+            => CreateSslClient(new IPEndPoint(remoteIp, remotePort), localEndPoint, connectionSettings);
+
+
         public static IConnection CreateRedundantServer(ConnectionEndPoint[] endPoints)
             => ServiceRef.Create<IConnection>(new RedundantConnection(endPoints.Select(endpoint => CreateServer(endpoint)).ToArray()));
 
@@ -46,6 +77,7 @@ namespace TransactTcp
 
         public static IConnection CreateRedundantServer(IPAddress[] localAddresses, int localPort, ConnectionSettings connectionSettings = null)
             => ServiceRef.Create<IConnection>(new RedundantConnection(localAddresses.Select(localAddress => CreateServer(localAddress, localPort, connectionSettings: connectionSettings)).ToArray()));
+
 
         public static IConnection CreateRedundantClient(ConnectionEndPoint[] endPoints)
             => ServiceRef.Create<IConnection>(new RedundantConnection(endPoints.Select(endpoint => CreateClient(endpoint)).ToArray()));

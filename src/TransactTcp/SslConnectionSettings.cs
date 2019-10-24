@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
@@ -8,9 +7,9 @@ using System.Text;
 
 namespace TransactTcp
 {
-    public class ConnectionSettings
+    public class SslConnectionSettings : ConnectionSettings
     {
-        public ConnectionSettings(
+        public SslConnectionSettings(
             int keepAliveMilliseconds = 500,
             int reconnectionDelayMilliseconds = 1000,
             X509Certificate sslCertificate = null,
@@ -25,6 +24,7 @@ namespace TransactTcp
             bool> sslValidateServerCertificateCallback = null,
             string sslServerHost = null
             )
+            : base(keepAliveMilliseconds, reconnectionDelayMilliseconds)
         {
             if (keepAliveMilliseconds <= 0)
             {
@@ -36,16 +36,26 @@ namespace TransactTcp
                 throw new ArgumentOutOfRangeException(nameof(reconnectionDelayMilliseconds));
             }
 
-            KeepAliveMilliseconds = keepAliveMilliseconds;
-            ReconnectionDelayMilliseconds = reconnectionDelayMilliseconds;
+            SslCertificate = sslCertificate;
+            SslClientCertificateRequired = sslClientCertificateRequired;
+            SslEnabledProtocols = sslEnabledProtocols;
+            SslCheckCertificateRevocation = sslCheckCertificateRevocation;
+            SslValidateCertificateCallback = sslValidateServerCertificateCallback;
+            SslServerHost = sslServerHost;
         }
 
 
-        public static ConnectionSettings Default { get; } = new ConnectionSettings();
+        public X509Certificate SslCertificate { get; }
 
-        public int KeepAliveMilliseconds { get; }
+        public bool SslClientCertificateRequired { get; }
 
-        public int ReconnectionDelayMilliseconds { get; }
+        public SslProtocols SslEnabledProtocols { get; }
+
+        public bool SslCheckCertificateRevocation { get; }
+
+        public Func<object, X509Certificate, X509Chain, SslPolicyErrors, bool> SslValidateCertificateCallback { get; }
+
+        public string SslServerHost { get; }
 
     }
 }

@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <None Remove="Resources\toxiproxy-server-windows-amd64.exe" />
+    <None Remove="Resources\transact-tcp.pfx" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +26,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TransactTcp\TransactTcp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\transact-tcp.pfx" />
   </ItemGroup>
 
 </Project>

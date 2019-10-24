@@ -25,7 +25,7 @@ namespace TransactTcp
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
         private CancellationTokenSource _sendKeepAliveLoopCancellationTokenSource;
         protected readonly StateMachine<ConnectionState, ConnectionTrigger> _connectionStateMachine;
-        protected Stream _streamToClient;
+        protected Stream _connectedStream;
         private AutoResetEvent _sendKeepAliveResetEvent;
         private Task _receiveLoopTask;
         private Task _sendKeepAliveLoopTask;
@@ -121,7 +121,7 @@ namespace TransactTcp
                             {
                                 if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
                                 {
-                                    await _streamToClient.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
+                                    await _connectedStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
                                 }
                             });
                         }
@@ -166,7 +166,7 @@ namespace TransactTcp
                     var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                     while (true)
                     {
-                        await _streamToClient.ReadBufferedAsync(messageSizeBuffer, cancellationToken);
+                        await _connectedStream.ReadBufferedAsync(messageSizeBuffer, cancellationToken);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -178,7 +178,7 @@ namespace TransactTcp
 
                         if (_receivedActionStreamAsync != null)
                         {
-                            var bufferedStream = new NetworkBufferedReadStream(_streamToClient, messageLength);
+                            var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
                             await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
                             await bufferedStream.FlushAsync();
                         }
@@ -186,7 +186,7 @@ namespace TransactTcp
                         {
                             var messageBuffer = new byte[messageLength];
                             
-                            await _streamToClient.ReadBufferedAsync(messageBuffer, cancellationToken);
+                            await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
 
                             if (_receivedActionAsync != null)
                                 await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
@@ -232,8 +232,8 @@ namespace TransactTcp
                 _sendKeepAliveLoopTask = null;
             }
 
-            _streamToClient?.Close();
-            _streamToClient = null;
+            _connectedStream?.Close();
+            _connectedStream = null;
         }
 
         protected abstract bool IsStreamConnected { get; }
@@ -293,8 +293,8 @@ namespace TransactTcp
 
                 try
                 {
-                    await _streamToClient?.WriteAsync(lenInBytes, 0, 4);
-                    await _streamToClient?.WriteAsync(data, 0, data.Length);
+                    await _connectedStream?.WriteAsync(lenInBytes, 0, 4);
+                    await _connectedStream?.WriteAsync(data, 0, data.Length);
                 }
                 catch (Exception)
                 {

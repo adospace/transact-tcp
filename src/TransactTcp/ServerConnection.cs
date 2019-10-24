@@ -54,30 +54,12 @@ namespace TransactTcp
             }
 
             _tcpToClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+            _connectedStream = await CreateConnectedStreamAsync(_tcpToClient, cancellationToken);
+        }
 
-            if (!_connectionSettings.SslConnection)
-            {
-                _streamToClient = _tcpToClient.GetStream();
-            }
-            else
-            {
-                var sslStream = new SslStream(
-                    _tcpToClient.GetStream(),
-                    true,
-                    _connectionSettings.SslValidateCertificateCallback == null ? null : new RemoteCertificateValidationCallback(_connectionSettings.SslValidateCertificateCallback),
-                    null
-                    );
-                
-                await sslStream.AuthenticateAsServerAsync(
-                    _connectionSettings.SslCertificate, 
-                    _connectionSettings.SslClientCertificateRequired, 
-                    _connectionSettings.SslEnabledProtocols, 
-                    _connectionSettings.SslCheckCertificateRevocation);
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                _streamToClient = sslStream;
-            }
+        protected virtual Task<Stream> CreateConnectedStreamAsync(TcpClient tcpClient, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Stream>(tcpClient.GetStream());
         }
 
         protected override void OnDisconnect()

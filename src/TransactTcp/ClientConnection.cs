@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -52,34 +53,12 @@ namespace TransactTcp
                             }
                         }
 
-                        _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
-
-                        if (!_connectionSettings.SslConnection)
-                        {
-                            _streamToClient = _tcpClient.GetStream();
-                        }
-                        else
-                        {
-                            var sslStream = new SslStream(
-                                _tcpClient.GetStream(),
-                                true,
-                                _connectionSettings.SslValidateCertificateCallback == null ? null : new RemoteCertificateValidationCallback(_connectionSettings.SslValidateCertificateCallback),
-                                null
-                                );
-
-                            await sslStream.AuthenticateAsClientAsync(
-                                _connectionSettings.SslServerHost,
-                                _connectionSettings.SslCertificate == null ? null : new X509CertificateCollection(new[] { _connectionSettings.SslCertificate }),
-                                _connectionSettings.SslEnabledProtocols,
-                                _connectionSettings.SslCheckCertificateRevocation);
-
-                            cancellationToken.ThrowIfCancellationRequested();
-
-                            _streamToClient = sslStream;
-                        }
-
                         if (!connectTask.IsFaulted)
+                        {
+                            _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+                            _connectedStream = await CreateConnectedStreamAsync(_tcpClient, cancellationToken);
                             break;
+                        }
 
                         if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelayMilliseconds))
                             break;
@@ -90,6 +69,11 @@ namespace TransactTcp
                     }
                 }
             }
+        }
+
+        protected virtual Task<Stream> CreateConnectedStreamAsync(TcpClient tcpClient, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Stream>(tcpClient.GetStream());
         }
 
         protected override void OnDisconnect()

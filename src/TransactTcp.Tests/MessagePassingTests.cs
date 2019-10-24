@@ -265,42 +265,51 @@ namespace TransactTcp.Tests
         public async Task ServerAndClientShouldJustWorkInSsl()
         {
 
-            using var server = ConnectionFactory.CreateServer(15000,
-                new ConnectionSettings(
-                    sslConnection: true,
-                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("")),
-                    sslValidateServerCertificateCallback: (
-                         object sender,
-                         X509Certificate certificate,
-                         X509Chain chain,
-                         SslPolicyErrors sslPolicyErrors) => true //pass anything
+            using var server = ConnectionFactory.CreateSslServer(15000,
+                new SslConnectionSettings(
+                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("transact-tcp.pfx"), "password")
                     ));
 
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 1500, connectionSettings:
-                new ConnectionSettings(
-                    sslConnection: true,
-                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("")),
+            using var client = ConnectionFactory.CreateSslClient(IPAddress.Loopback, 15000, connectionSettings:
+                new SslConnectionSettings(
+                    sslServerHost: "transact-tcp",
                     sslValidateServerCertificateCallback: (
                          object sender,
                          X509Certificate certificate,
                          X509Chain chain,
-                         SslPolicyErrors sslPolicyErrors) => true //pass anything
+                         SslPolicyErrors sslPolicyErrors) => true //pass everything
                     ));
 
             using var serverConnectedEvent = new AutoResetEvent(false);
             using var clientConnectedEvent = new AutoResetEvent(false);
+            using var receivedFromClientEvent = new AutoResetEvent(false);
+            using var receivedFromServerEvent = new AutoResetEvent(false);
 
             client.Start(
-                receivedAction: (c, data) => { },
+                receivedAction: (c, data) => 
+                {
+                    if (System.Text.Encoding.UTF8.GetString(data) == "SENT FROM SERVER")
+                        receivedFromServerEvent.Set();                
+                },
                 connectionStateChangedAction: (c, fromState, toState)=> { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
                 );
 
             server.Start(
-                receivedAction: (c, data) => { },
+                receivedAction: (c, data) =>
+                {
+                    if (System.Text.Encoding.UTF8.GetString(data) == "SENT FROM CLIENT")
+                        receivedFromClientEvent.Set();
+                },
                 connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
                 );
 
-            WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 2000).ShouldBeTrue();
+            WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 4000).ShouldBeTrue();
+
+            await client.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT"));
+            await server.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER"));
+
+
+            WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 4000).ShouldBeTrue();
         }
     }
 }
