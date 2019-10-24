@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactTcp", "TransactTcp\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactTcp.Tests", "TransactTcp.Tests\TransactTcp.Tests.csproj", "{92EB2C32-0E2A-4181-925E-29439C960452}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TransactTcp.Demo", "TransactTcp.Demo\TransactTcp.Demo.csproj", "{8239D630-F227-4597-B60E-9D6F22283BD5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactTcp.Demo", "TransactTcp.Demo\TransactTcp.Demo.csproj", "{8239D630-F227-4597-B60E-9D6F22283BD5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

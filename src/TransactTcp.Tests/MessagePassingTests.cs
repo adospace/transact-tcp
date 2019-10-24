@@ -105,7 +105,7 @@ namespace TransactTcp.Tests
         }
 
         [TestMethod]
-        public async Task MessagesShouldPassedThruRedundantChannelWhenNotAllChildConnectionsAreSlowOrDown()
+        public async Task MessagesShouldPassThruRedundantChannelWhenNotAllChildConnectionsAreSlowOrDown()
         {
             var toxiproxyServerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TransactTcp.Tests", "toxiproxy-server-windows-amd64.exe");
 
@@ -151,12 +151,15 @@ namespace TransactTcp.Tests
 
                 using var serverConnectedEvent = new AutoResetEvent(false);
                 using var clientConnectedEvent = new AutoResetEvent(false);
+                using var errorsOnServerSideEvent = new AutoResetEvent(false);
+                using var errorsOnClientSideEvent = new AutoResetEvent(false);
 
                 int counterOfMessagesArrivedAtServer = 0;
                 serverConnection.Start(
                     receivedAction: (c, data) => 
                     {
-                        BitConverter.ToInt32(data).ShouldBe(counterOfMessagesArrivedAtServer);
+                        if (BitConverter.ToInt32(data) != counterOfMessagesArrivedAtServer)
+                            errorsOnServerSideEvent.Set();
                         counterOfMessagesArrivedAtServer++;
                     },
                     connectionStateChangedAction: (c, fromState, toState) => 
@@ -169,7 +172,8 @@ namespace TransactTcp.Tests
                 clientConnection.Start(
                     receivedAction: (c, data) => 
                     {
-                        BitConverter.ToInt32(data).ShouldBe(counterOfMessagesArrivedAtClient);
+                        if (BitConverter.ToInt32(data) != counterOfMessagesArrivedAtClient)
+                            errorsOnClientSideEvent.Set();
                         counterOfMessagesArrivedAtClient++;
                     },
                     connectionStateChangedAction: (c, fromState, toState) => 
@@ -178,7 +182,7 @@ namespace TransactTcp.Tests
                             clientConnectedEvent.Set();
                     });
 
-                WaitHandle.WaitAll(new[] { serverConnectedEvent, clientConnectedEvent }, 1000).ShouldBeTrue();
+                WaitHandle.WaitAll(new[] { serverConnectedEvent, clientConnectedEvent }, 5000).ShouldBeTrue();
 
                 var cancellationTokenSource = new CancellationTokenSource();
 #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
@@ -201,7 +205,7 @@ namespace TransactTcp.Tests
                 interface1Proxy.Enabled = false;
                 await client.UpdateAsync(interface1Proxy);
 
-                await Task.Delay(1000);
+                WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 2000).ShouldBeFalse();
 
                 interface1Proxy.Enabled = true;
                 await client.UpdateAsync(interface1Proxy);
@@ -209,23 +213,23 @@ namespace TransactTcp.Tests
                 interface2Proxy.Enabled = false;
                 await client.UpdateAsync(interface2Proxy);
 
-                await Task.Delay(1000);
+                WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 2000).ShouldBeFalse();
 
                 interface2Proxy.Enabled = true;
                 await client.UpdateAsync(interface2Proxy);
 
-                //var latencyProxy = new LatencyToxic()
-                //{ 
-                //    Name = "latencyInterface2",
-                //    Stream = ToxicDirection.DownStream,
-                //    Toxicity = 1.0,
-                //};
-                //latencyProxy.Attributes.Jitter = 100;
-                //latencyProxy.Attributes.Latency = 300;
+                var latencyProxy = new LatencyToxic()
+                {
+                    Name = "latencyInterface2",
+                    Stream = ToxicDirection.DownStream,
+                    Toxicity = 1.0,
+                };
+                latencyProxy.Attributes.Jitter = 100;
+                latencyProxy.Attributes.Latency = 300;
 
-                //await interface1Proxy.AddAsync(latencyProxy);
+                await interface1Proxy.AddAsync(latencyProxy);
 
-                //await Task.Delay(1000);
+                WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 2000).ShouldBeFalse();
 
                 cancellationTokenSource.Cancel();
 

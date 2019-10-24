@@ -20,13 +20,13 @@ namespace TransactTcp.Tests
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
                     serverStateChangedEvent.Set();
             });
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
                     clientStateChangedEvent.Set();
             });
 
@@ -97,13 +97,13 @@ namespace TransactTcp.Tests
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
                     clientStateChangedEvent.Set();
             });
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
                     serverStateChangedEvent.Set();
             });
 
