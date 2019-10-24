@@ -267,7 +267,7 @@ namespace TransactTcp.Tests
 
             using var server = ConnectionFactory.CreateSslServer(15000,
                 new SslConnectionSettings(
-                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("transact-tcp.pfx"), "password")
+                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("transact-tcp_pfx"), "password")
                     ));
 
             using var client = ConnectionFactory.CreateSslClient(IPAddress.Loopback, 15000, connectionSettings:

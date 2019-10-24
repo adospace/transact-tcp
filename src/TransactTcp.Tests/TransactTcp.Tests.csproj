@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <None Remove="Resources\toxiproxy-server-windows-amd64.exe" />
-    <None Remove="Resources\transact-tcp.pfx" />
+    <None Remove="Resources\transact-tcp_pfx" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\transact-tcp.pfx" />
+    <EmbeddedResource Include="Resources\transact-tcp_pfx" />
   </ItemGroup>
 
 </Project>
