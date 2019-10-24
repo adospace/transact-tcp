@@ -11,9 +11,8 @@ namespace TransactTcp
     internal class ServerConnection : Connection
     {
         public ServerConnection(
-            IPEndPoint endPoint, 
-            ConnectionSettings connectionSettings = null) 
-            : base(endPoint, connectionSettings)
+           ConnectionEndPoint connectionEndPoint) 
+            : base(connectionEndPoint.LocalEndPoint, connectionEndPoint.ConnectionSettings)
         {
         }
 

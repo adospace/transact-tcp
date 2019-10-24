@@ -13,10 +13,9 @@ namespace TransactTcp
         private readonly IPEndPoint _localEndPoint;
 
         public ClientConnection(
-            IPEndPoint endPoint,
-            IPEndPoint localEndPoint = null, 
-            ConnectionSettings connectionSettings = null) 
-            : base(endPoint, connectionSettings)
+            ConnectionEndPoint connectionEndPoint,
+            IPEndPoint localEndPoint = null) 
+            : base(connectionEndPoint.RemoteEndPoint, connectionEndPoint.ConnectionSettings)
         {
             _localEndPoint = localEndPoint;
         }
