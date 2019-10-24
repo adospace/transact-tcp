@@ -10,24 +10,27 @@ namespace TransactTcp
 {
     internal class ServerConnection : Connection
     {
+        TcpClient _tcpToClient;
+
         public ServerConnection(
            ConnectionEndPoint connectionEndPoint) 
             : base(connectionEndPoint.LocalEndPoint, connectionEndPoint.ConnectionSettings)
         {
         }
 
-       
+        protected override bool IsStreamConnected => (_tcpToClient?.Connected).GetValueOrDefault();
+
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
             var tcpListener = new TcpListener(_endPoint);
-            
+
             tcpListener.Start(1);
 
             using (cancellationToken.Register(() => tcpListener.Stop()))
             {
                 try
                 {
-                    _tcpClient = await tcpListener.AcceptTcpClientAsync();
+                    _tcpToClient = await tcpListener.AcceptTcpClientAsync();
                 }
                 catch (InvalidOperationException)
                 {
@@ -47,6 +50,17 @@ namespace TransactTcp
                     tcpListener.Stop();
                 }
             }
+
+            _tcpToClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+            _streamToClient = _tcpToClient.GetStream();
+        }
+
+        protected override void OnDisconnect()
+        {
+            base.OnDisconnect();
+
+            _tcpToClient?.Close();
+            _tcpToClient = null;
         }
 
     }

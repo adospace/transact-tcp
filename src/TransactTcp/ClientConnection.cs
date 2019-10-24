@@ -11,6 +11,7 @@ namespace TransactTcp
     internal class ClientConnection : Connection
     {
         private readonly IPEndPoint _localEndPoint;
+        private TcpClient _tcpClient;
 
         public ClientConnection(
             ConnectionEndPoint connectionEndPoint,
@@ -19,6 +20,8 @@ namespace TransactTcp
         {
             _localEndPoint = localEndPoint;
         }
+
+        protected override bool IsStreamConnected => (_tcpClient?.Connected).GetValueOrDefault();
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
@@ -47,6 +50,9 @@ namespace TransactTcp
                             }
                         }
 
+                        _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+                        _streamToClient = _tcpClient.GetStream();
+
                         if (!connectTask.IsFaulted)
                             break;
 
@@ -59,6 +65,14 @@ namespace TransactTcp
                     }
                 }
             }
+        }
+
+        protected override void OnDisconnect()
+        {
+            base.OnDisconnect();
+
+            _tcpClient?.Close();
+            _tcpClient = null;
         }
     }
 }

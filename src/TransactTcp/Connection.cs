@@ -2,6 +2,7 @@
 using Stateless;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -24,7 +25,7 @@ namespace TransactTcp
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
         private CancellationTokenSource _sendKeepAliveLoopCancellationTokenSource;
         protected readonly StateMachine<ConnectionState, ConnectionTrigger> _connectionStateMachine;
-        protected TcpClient _tcpClient;
+        protected Stream _streamToClient;
         private AutoResetEvent _sendKeepAliveResetEvent;
         private Task _receiveLoopTask;
         private Task _sendKeepAliveLoopTask;
@@ -118,9 +119,9 @@ namespace TransactTcp
 
                             ServiceRef.Call(this, async () =>
                             {
-                                if (_connectionStateMachine.State == ConnectionState.Connected && (_tcpClient?.Connected).GetValueOrDefault())
+                                if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
                                 {
-                                    await _tcpClient.GetStream().WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
+                                    await _streamToClient.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
                                 }
                             });
                         }
@@ -165,7 +166,7 @@ namespace TransactTcp
                     var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                     while (true)
                     {
-                        await _tcpClient.GetStream().ReadBufferedAsync(messageSizeBuffer, cancellationToken);
+                        await _streamToClient.ReadBufferedAsync(messageSizeBuffer, cancellationToken);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -177,7 +178,7 @@ namespace TransactTcp
 
                         if (_receivedActionStreamAsync != null)
                         {
-                            var bufferedStream = new NetworkBufferedReadStream(_tcpClient.GetStream(), messageLength);
+                            var bufferedStream = new NetworkBufferedReadStream(_streamToClient, messageLength);
                             await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
                             await bufferedStream.FlushAsync();
                         }
@@ -185,7 +186,7 @@ namespace TransactTcp
                         {
                             var messageBuffer = new byte[messageLength];
                             
-                            await _tcpClient.GetStream().ReadBufferedAsync(messageBuffer, cancellationToken);
+                            await _streamToClient.ReadBufferedAsync(messageBuffer, cancellationToken);
 
                             if (_receivedActionAsync != null)
                                 await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
@@ -216,7 +217,7 @@ namespace TransactTcp
             }
         }
 
-        private void OnDisconnect()
+        protected virtual void OnDisconnect()
         {
             //System.Diagnostics.Debug.WriteLine($"{GetType()}: OnDisconnect");
 
@@ -231,9 +232,11 @@ namespace TransactTcp
                 _sendKeepAliveLoopTask = null;
             }
 
-            _tcpClient?.Close();
-            _tcpClient = null;
+            _streamToClient?.Close();
+            _streamToClient = null;
         }
+
+        protected abstract bool IsStreamConnected { get; }
 
         private async Task OnConnectAsyncCore()
         {
@@ -253,7 +256,6 @@ namespace TransactTcp
                     if (_connectionStateMachine.State == ConnectionState.Connecting ||
                         _connectionStateMachine.State == ConnectionState.LinkError)
                     {
-                        _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
                         _connectionStateMachine.Fire(ConnectionTrigger.Connected);
                     }
                 });
@@ -283,7 +285,7 @@ namespace TransactTcp
 
         public  async Task SendDataAsync(byte[] data)
         {
-            if (_connectionStateMachine.State == ConnectionState.Connected && (_tcpClient?.Connected).GetValueOrDefault())
+            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
             {
                 _sendKeepAliveResetEvent?.Set();
 
@@ -291,8 +293,8 @@ namespace TransactTcp
 
                 try
                 {
-                    await _tcpClient?.GetStream().WriteAsync(lenInBytes, 0, 4);
-                    await _tcpClient?.GetStream().WriteAsync(data, 0, data.Length);
+                    await _streamToClient?.WriteAsync(lenInBytes, 0, 4);
+                    await _streamToClient?.WriteAsync(data, 0, data.Length);
                 }
                 catch (Exception)
                 {

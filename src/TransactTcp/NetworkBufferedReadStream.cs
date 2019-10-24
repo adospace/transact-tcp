@@ -10,11 +10,11 @@ namespace TransactTcp
 {
     public class NetworkBufferedReadStream : Stream
     {
-        private readonly NetworkStream _networkStream;
+        private readonly Stream _innerStream;
 
-        internal NetworkBufferedReadStream(NetworkStream networkStream, long messageLength)
+        internal NetworkBufferedReadStream(Stream stream, long messageLength)
         {
-            _networkStream = networkStream;
+            _innerStream = stream;
 
             Length = messageLength;
         }
@@ -39,7 +39,7 @@ namespace TransactTcp
         {
             if (_position < Length)
             {
-                await _networkStream.ReadBufferedAsync(new byte[Length - _position], cancellationToken);
+                await _innerStream.ReadBufferedAsync(new byte[Length - _position], cancellationToken);
             }
 
             _position = Length;
@@ -47,14 +47,14 @@ namespace TransactTcp
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            _networkStream.ReadBuffered(buffer, offset, count);
+            _innerStream.ReadBuffered(buffer, offset, count);
             _position += count;
             return count;
         }
 
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            await _networkStream.ReadBufferedAsync(buffer, offset, count, cancellationToken);
+            await _innerStream.ReadBufferedAsync(buffer, offset, count, cancellationToken);
             _position += count;
             return count;
         }
