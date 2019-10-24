@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Toxiproxy.Net;
@@ -257,6 +259,48 @@ namespace TransactTcp.Tests
             {
                 toxyproxyServerProcess.Kill();
             }
+        }
+
+        [TestMethod]
+        public async Task ServerAndClientShouldJustWorkInSsl()
+        {
+
+            using var server = ConnectionFactory.CreateServer(15000,
+                new ConnectionSettings(
+                    sslConnection: true,
+                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("")),
+                    sslValidateServerCertificateCallback: (
+                         object sender,
+                         X509Certificate certificate,
+                         X509Chain chain,
+                         SslPolicyErrors sslPolicyErrors) => true //pass anything
+                    ));
+
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 1500, connectionSettings:
+                new ConnectionSettings(
+                    sslConnection: true,
+                    sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("")),
+                    sslValidateServerCertificateCallback: (
+                         object sender,
+                         X509Certificate certificate,
+                         X509Chain chain,
+                         SslPolicyErrors sslPolicyErrors) => true //pass anything
+                    ));
+
+            using var serverConnectedEvent = new AutoResetEvent(false);
+            using var clientConnectedEvent = new AutoResetEvent(false);
+
+            client.Start(
+                receivedAction: (c, data) => { },
+                connectionStateChangedAction: (c, fromState, toState)=> { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
+                );
+
+            server.Start(
+                receivedAction: (c, data) => { },
+                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
+                );
+
+            WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 2000).ShouldBeTrue();
         }
     }
 }

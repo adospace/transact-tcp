@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +17,7 @@ namespace TransactTcp
 
         public ClientConnection(
             ConnectionEndPoint connectionEndPoint,
-            IPEndPoint localEndPoint = null) 
+            IPEndPoint localEndPoint = null)
             : base(connectionEndPoint.RemoteEndPoint, connectionEndPoint.ConnectionSettings)
         {
             _localEndPoint = localEndPoint;
@@ -61,13 +62,16 @@ namespace TransactTcp
                         {
                             var sslStream = new SslStream(
                                 _tcpClient.GetStream(),
-                                false,
-                                new RemoteCertificateValidationCallback(_connectionSettings.SslValidateServerCertificateCallback),
+                                true,
+                                _connectionSettings.SslValidateCertificateCallback == null ? null : new RemoteCertificateValidationCallback(_connectionSettings.SslValidateCertificateCallback),
                                 null
                                 );
 
                             await sslStream.AuthenticateAsClientAsync(
-                                _connectionSettings.SslServerHost);
+                                _connectionSettings.SslServerHost,
+                                _connectionSettings.SslCertificate == null ? null : new X509CertificateCollection(new[] { _connectionSettings.SslCertificate }),
+                                _connectionSettings.SslEnabledProtocols,
+                                _connectionSettings.SslCheckCertificateRevocation);
 
                             cancellationToken.ThrowIfCancellationRequested();
 

@@ -10,21 +10,6 @@ namespace TransactTcp
 {
     public class ConnectionSettings
     {
-        private static bool ValidateServerCertificate(
-#pragma warning disable IDE0060 // Remove unused parameter
-              object sender,
-              X509Certificate certificate,
-              X509Chain chain,
-#pragma warning restore IDE0060 // Remove unused parameter
-              SslPolicyErrors sslPolicyErrors)
-        {
-            if (sslPolicyErrors == SslPolicyErrors.None)
-                return true;
-
-            // Do not allow this client to communicate with unauthenticated servers.
-            return false;
-        }
-
         public ConnectionSettings(
             int keepAliveMilliseconds = 500,
             int reconnectionDelayMilliseconds = 1000,
@@ -57,7 +42,7 @@ namespace TransactTcp
             SslClientCertificateRequired = sslClientCertificateRequired;
             SslEnabledProtocols = sslEnabledProtocols;
             SslCheckCertificateRevocation = sslCheckCertificateRevocation;
-            SslValidateServerCertificateCallback = sslValidateServerCertificateCallback ?? ValidateServerCertificate;
+            SslValidateCertificateCallback = sslValidateServerCertificateCallback;
 
             if (SslConnection)
             {
@@ -82,7 +67,7 @@ namespace TransactTcp
 
         public bool SslCheckCertificateRevocation { get; }
 
-        public Func<object, X509Certificate, X509Chain, SslPolicyErrors, bool> SslValidateServerCertificateCallback { get; }
+        public Func<object, X509Certificate, X509Chain, SslPolicyErrors, bool> SslValidateCertificateCallback { get; }
         
         public string SslServerHost { get; }
     }

@@ -4,7 +4,6 @@ using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -62,12 +61,20 @@ namespace TransactTcp
             }
             else
             {
-                var sslStream = new SslStream(_tcpToClient.GetStream(), true);
+                var sslStream = new SslStream(
+                    _tcpToClient.GetStream(),
+                    true,
+                    _connectionSettings.SslValidateCertificateCallback == null ? null : new RemoteCertificateValidationCallback(_connectionSettings.SslValidateCertificateCallback),
+                    null
+                    );
+                
                 await sslStream.AuthenticateAsServerAsync(
                     _connectionSettings.SslCertificate, 
                     _connectionSettings.SslClientCertificateRequired, 
                     _connectionSettings.SslEnabledProtocols, 
                     _connectionSettings.SslCheckCertificateRevocation);
+
+                cancellationToken.ThrowIfCancellationRequested();
 
                 _streamToClient = sslStream;
             }
