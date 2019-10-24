@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -51,12 +52,32 @@ namespace TransactTcp
                         }
 
                         _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
-                        _streamToClient = _tcpClient.GetStream();
+
+                        if (!_connectionSettings.SslConnection)
+                        {
+                            _streamToClient = _tcpClient.GetStream();
+                        }
+                        else
+                        {
+                            var sslStream = new SslStream(
+                                _tcpClient.GetStream(),
+                                false,
+                                new RemoteCertificateValidationCallback(_connectionSettings.SslValidateServerCertificateCallback),
+                                null
+                                );
+
+                            await sslStream.AuthenticateAsClientAsync(
+                                _connectionSettings.SslServerHost);
+
+                            cancellationToken.ThrowIfCancellationRequested();
+
+                            _streamToClient = sslStream;
+                        }
 
                         if (!connectTask.IsFaulted)
                             break;
 
-                        if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelay))
+                        if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelayMilliseconds))
                             break;
                     }
                     catch (OperationCanceledException)

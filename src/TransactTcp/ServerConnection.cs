@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +13,7 @@ namespace TransactTcp
 {
     internal class ServerConnection : Connection
     {
-        TcpClient _tcpToClient;
+        protected TcpClient _tcpToClient;
 
         public ServerConnection(
            ConnectionEndPoint connectionEndPoint) 
@@ -52,7 +55,22 @@ namespace TransactTcp
             }
 
             _tcpToClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
-            _streamToClient = _tcpToClient.GetStream();
+
+            if (!_connectionSettings.SslConnection)
+            {
+                _streamToClient = _tcpToClient.GetStream();
+            }
+            else
+            {
+                var sslStream = new SslStream(_tcpToClient.GetStream(), true);
+                await sslStream.AuthenticateAsServerAsync(
+                    _connectionSettings.SslCertificate, 
+                    _connectionSettings.SslClientCertificateRequired, 
+                    _connectionSettings.SslEnabledProtocols, 
+                    _connectionSettings.SslCheckCertificateRevocation);
+
+                _streamToClient = sslStream;
+            }
         }
 
         protected override void OnDisconnect()
