@@ -70,11 +70,11 @@ namespace TransactTcp.Tests
 
             int currentMessageSize = -1;
 
-            using var server = ConnectionFactory.CreateServer(15000);
+            using var server = ConnectionFactory.CreateServer(15001);
 
             using var client = ConnectionFactory.CreateClient(
                 IPAddress.Loopback,
-                15000);
+                15001);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -132,8 +132,8 @@ namespace TransactTcp.Tests
                 {
                     Name = "interface1Proxy",
                     Enabled = true,
-                    Listen = "127.0.0.1:15000",
-                    Upstream = "127.0.0.1:15001"
+                    Listen = "127.0.0.1:12000",
+                    Upstream = "127.0.0.1:12001"
                 };
 
                 await client.AddAsync(interface1Proxy);
@@ -142,14 +142,14 @@ namespace TransactTcp.Tests
                 {
                     Name = "interface2Proxy",
                     Enabled = true,
-                    Listen = "127.0.0.1:16000",
-                    Upstream = "127.0.0.1:16001"
+                    Listen = "127.0.0.1:13000",
+                    Upstream = "127.0.0.1:13001"
                 };
 
                 await client.AddAsync(interface2Proxy);
 
-                using var serverConnection = ConnectionFactory.CreateRedundantServer(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 15001), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 16001) });
-                using var clientConnection = ConnectionFactory.CreateRedundantClient(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 15000), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 16000) });
+                using var serverConnection = ConnectionFactory.CreateRedundantServer(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12001), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 13001) });
+                using var clientConnection = ConnectionFactory.CreateRedundantClient(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12000), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 13000) });
 
                 using var serverConnectedEvent = new AutoResetEvent(false);
                 using var clientConnectedEvent = new AutoResetEvent(false);
@@ -264,12 +264,12 @@ namespace TransactTcp.Tests
         public async Task ServerAndClientShouldJustWorkInSsl()
         {
 
-            using var server = ConnectionFactory.CreateSslServer(15000,
+            using var server = ConnectionFactory.CreateSslServer(11000,
                 new SslConnectionSettings(
                     sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("transact-tcp_pfx"), "password")
                     ));
 
-            using var client = ConnectionFactory.CreateSslClient(IPAddress.Loopback, 15000, connectionSettings:
+            using var client = ConnectionFactory.CreateSslClient(IPAddress.Loopback, 11000, connectionSettings:
                 new SslConnectionSettings(
                     sslServerHost: "transact-tcp",
                     sslValidateServerCertificateCallback: (
@@ -314,9 +314,9 @@ namespace TransactTcp.Tests
         [TestMethod]
         public async Task SendMessagesUsingMemoryBuffer()
         {
-            using var server = ConnectionFactory.CreateServer(15000);
+            using var server = ConnectionFactory.CreateServer(11001);
 
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 11001);
 
             using var serverConnectedEvent = new AutoResetEvent(false);
             using var clientConnectedEvent = new AutoResetEvent(false);
