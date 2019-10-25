@@ -45,9 +45,11 @@ namespace TransactTcp
 
             _connectionStateMachine.OnTransitioned((transition) =>
                 _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination));
+
+            ConfigureStateMachine();
         }
 
-        protected virtual void ConfigureStateMachine(StateMachine<ConnectionState, ConnectionTrigger> stateMachine)
+        protected virtual void ConfigureStateMachine()
         {
             _connectionStateMachine.Configure(ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
@@ -99,7 +101,6 @@ namespace TransactTcp
                     OnDisconnect();
                     Task.Run(OnConnectAsyncCore);
                 });
-
         }
 
         private void SendKeepAliveLoopAsync()

@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TransactTcp
+namespace TransactTcp.Ssl
 {
     internal class SslServerConnection : ServerConnection
     {
@@ -17,7 +17,7 @@ namespace TransactTcp
 
         public SslServerConnection(
             SslConnectionEndPoint connectionEndPoint,
-            Action<IConnection, AuthenticationException> onAuthenticationException = null) 
+            Action<IConnection, AuthenticationException> onAuthenticationException = null)
             : base(connectionEndPoint)
         {
             _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? SslConnectionSettings.Default; ;

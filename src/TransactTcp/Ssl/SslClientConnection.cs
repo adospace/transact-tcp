@@ -10,7 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TransactTcp
+namespace TransactTcp.Ssl
 {
     internal class SslClientConnection : ClientConnection
     {
@@ -20,7 +20,7 @@ namespace TransactTcp
         public SslClientConnection(
             SslConnectionEndPoint connectionEndPoint,
             IPEndPoint localEndPoint = null,
-            Action<IConnection, AuthenticationException> onAuthenticationException = null) 
+            Action<IConnection, AuthenticationException> onAuthenticationException = null)
             : base(connectionEndPoint, localEndPoint)
         {
             _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? SslConnectionSettings.Default;

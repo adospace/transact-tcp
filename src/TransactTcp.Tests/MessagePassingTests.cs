@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Toxiproxy.Net;
 using Toxiproxy.Net.Toxics;
+using TransactTcp.Ssl;
 using TransactTcp.Tests.Resources;
 
 namespace TransactTcp.Tests
