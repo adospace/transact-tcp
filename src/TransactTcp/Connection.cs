@@ -1,6 +1,7 @@
 ﻿using ServiceActor;
 using Stateless;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -49,7 +50,6 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
                 .OnEntryFrom(ConnectionTrigger.Disconnect, ()=>
                 {
-                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Disconnected OnEntryFrom(ConnectionTrigger.Disconnect)");
                     OnDisconnect();
                 });
 
@@ -65,7 +65,6 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
                 .OnEntry(() =>
                 {
-                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnEntry");
                     using (_receiveLoopTaskIsRunningEvent = new AutoResetEvent(false))
                     using (_sendKeepAliveTaskIsRunningEvent = new AutoResetEvent(false))
                     {
@@ -84,7 +83,6 @@ namespace TransactTcp
                 })
                 .OnExit(() =>
                 {
-                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.Connected OnExit");
                     _receiveLoopCancellationTokenSource?.Cancel();
                     _sendKeepAliveLoopCancellationTokenSource?.Cancel();
                     _sendKeepAliveResetEvent?.Set();
@@ -95,7 +93,6 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
                 .OnEntryFrom(ConnectionTrigger.LinkError, () =>
                 {
-                    //System.Diagnostics.Debug.WriteLine($"{GetType()}: ConnectionState.LinkError OnEntry");
                     OnDisconnect();
                     Task.Run(OnConnectAsyncCore);
                 });
@@ -103,7 +100,6 @@ namespace TransactTcp
 
         private void SendKeepAliveLoopAsync()
         {
-            //System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Enter");
             try
             {
                 using (_sendKeepAliveResetEvent = new AutoResetEvent(false))
@@ -146,13 +142,13 @@ namespace TransactTcp
             {
                 _sendKeepAliveLoopCancellationTokenSource = null;
                 _sendKeepAliveResetEvent = null;
-                //System.Diagnostics.Debug.WriteLine($"{GetType()}: SendKeepAliveLoopAsync Exit");
             }
         }
 
+        private readonly byte[] _messageSizeBuffer = new byte[4];
+
         private async Task ReceiveLoopAsync()
         {
-            ////System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Enter");
 #pragma warning disable IDE0068 // Use recommended dispose pattern
             var refToThis = ServiceRef.Create<IConnection>(this);
 #pragma warning restore IDE0068 // Use recommended dispose pattern
@@ -162,15 +158,14 @@ namespace TransactTcp
                 {
                     _receiveLoopTaskIsRunningEvent.Set();
 
-                    var messageSizeBuffer = new byte[4];
                     var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                     while (true)
                     {
-                        await _connectedStream.ReadBufferedAsync(messageSizeBuffer, cancellationToken);
+                        await _connectedStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        var messageLength = BitConverter.ToInt32(messageSizeBuffer, 0);
+                        var messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
                         if (messageLength == 0)
                             continue;
 
@@ -190,7 +185,7 @@ namespace TransactTcp
 
                             if (_receivedActionAsync != null)
                                 await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
-                            else if (_receivedAction != null)
+                            else //if (_receivedAction != null)
                                 _receivedAction(refToThis, messageBuffer);
                         }
                     }
@@ -212,15 +207,11 @@ namespace TransactTcp
             finally
             {
                 _receiveLoopCancellationTokenSource = null;
-
-                //System.Diagnostics.Debug.WriteLine($"{GetType()}: ReceiveLoopAsync Exit");
             }
         }
 
         protected virtual void OnDisconnect()
         {
-            //System.Diagnostics.Debug.WriteLine($"{GetType()}: OnDisconnect");
-
             if (_receiveLoopTask != null)
             {
                 Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
@@ -283,7 +274,7 @@ namespace TransactTcp
 
         public ConnectionState State { get => _connectionStateMachine.State; }
 
-        public  async Task SendDataAsync(byte[] data)
+        public async Task SendDataAsync(byte[] data, CancellationToken cancellationToken)
         {
             if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
             {
@@ -293,8 +284,8 @@ namespace TransactTcp
 
                 try
                 {
-                    await _connectedStream?.WriteAsync(lenInBytes, 0, 4);
-                    await _connectedStream?.WriteAsync(data, 0, data.Length);
+                    await _connectedStream?.WriteAsync(lenInBytes, 0, 4, cancellationToken);
+                    await _connectedStream?.WriteAsync(data, 0, data.Length, cancellationToken);
                 }
                 catch (Exception)
                 {
@@ -302,6 +293,34 @@ namespace TransactTcp
                 }
             }
         }
+
+#if NETSTANDARD2_1
+        public async Task SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+        {
+            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
+            {
+                _sendKeepAliveResetEvent?.Set();
+
+                using var memoryBufferOwner = MemoryPool<byte>.Shared.Rent(4);
+
+                if (!BitConverter.TryWriteBytes(memoryBufferOwner.Memory.Span, data.Length))
+                {
+                    throw new InvalidOperationException();
+                }                
+
+                try
+                {
+                
+                    await _connectedStream?.WriteAsync(memoryBufferOwner.Memory, cancellationToken).AsTask();
+                    await _connectedStream?.WriteAsync(data, cancellationToken).AsTask();
+                }
+                catch (Exception)
+                {
+                    _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                }
+            }
+        }
+#endif
 
         public virtual void Start(Action<IConnection, byte[]> receivedAction = null,
             Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null,

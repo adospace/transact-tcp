@@ -19,6 +19,6 @@ namespace TransactTcp
             SslConnectionSettings = connectionSettings;
         }
 
-        public SslConnectionSettings SslConnectionSettings { get; }
+        public SslConnectionSettings SslConnectionSettings { get; } = new SslConnectionSettings();
     }
 }

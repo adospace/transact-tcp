@@ -12,18 +12,7 @@ namespace TransactTcp
     {
         public ConnectionSettings(
             int keepAliveMilliseconds = 500,
-            int reconnectionDelayMilliseconds = 1000,
-            X509Certificate sslCertificate = null,
-            bool sslClientCertificateRequired = false,
-            SslProtocols sslEnabledProtocols = SslProtocols.Default,
-            bool sslCheckCertificateRevocation = false,
-            Func<
-              object,
-              X509Certificate,
-              X509Chain,
-              SslPolicyErrors,
-            bool> sslValidateServerCertificateCallback = null,
-            string sslServerHost = null
+            int reconnectionDelayMilliseconds = 1000
             )
         {
             if (keepAliveMilliseconds <= 0)

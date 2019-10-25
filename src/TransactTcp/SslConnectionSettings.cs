@@ -14,7 +14,7 @@ namespace TransactTcp
             int reconnectionDelayMilliseconds = 1000,
             X509Certificate sslCertificate = null,
             bool sslClientCertificateRequired = false,
-            SslProtocols sslEnabledProtocols = SslProtocols.Default,
+            SslProtocols sslEnabledProtocols = SslProtocols.Tls12,
             bool sslCheckCertificateRevocation = false,
             Func<
               object,
@@ -57,5 +57,6 @@ namespace TransactTcp
 
         public string SslServerHost { get; }
 
+        public static new SslConnectionSettings Default { get; } = new SslConnectionSettings();
     }
 }

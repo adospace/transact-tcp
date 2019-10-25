@@ -1,6 +1,7 @@
 ﻿using ServiceActor;
 using Stateless;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -161,7 +162,7 @@ namespace TransactTcp
 
         public ConnectionState State { get => _connectionStateMachine.State; }
 
-        public async Task SendDataAsync(byte[] data)
+        public async Task SendDataAsync(byte[] data, CancellationToken cancellationToken)
         {
             if (_connectionStateMachine.State == ConnectionState.Connected)
             {
@@ -172,10 +173,35 @@ namespace TransactTcp
                     var buffer = new byte[4 + data.Length];
                     BitConverter.GetBytes(_sentMessageCounter).CopyTo(buffer, 0);
                     data.CopyTo(buffer, 4);
-                    await childConnection.SendDataAsync(buffer);
+                    await childConnection.SendDataAsync(buffer, cancellationToken);
                 }
             }
         }
+
+#if NETSTANDARD2_1
+        public async Task SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+        {
+            if (_connectionStateMachine.State == ConnectionState.Connected)
+            {
+                _sentMessageCounter++;
+
+                foreach (var childConnection in _connections)
+                {
+                    int bufferLength = 4 + data.Length;
+                    using var memoryBufferOwner = MemoryPool<byte>.Shared.Rent(bufferLength);
+
+                    if (!BitConverter.TryWriteBytes(memoryBufferOwner.Memory.Slice(0, 4).Span, _sentMessageCounter))
+                    {
+                        throw new InvalidOperationException();
+                    }
+
+                    data.CopyTo(memoryBufferOwner.Memory.Slice(4));
+                    
+                    await childConnection.SendDataAsync(memoryBufferOwner.Memory, cancellationToken);
+                }
+            }
+        }
+#endif
 
         public void Start(Action<IConnection, byte[]> receivedAction = null, Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null)
         {

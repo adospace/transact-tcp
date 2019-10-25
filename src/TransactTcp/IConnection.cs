@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ServiceActor;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,6 +16,11 @@ namespace TransactTcp
 
         ConnectionState State { get; }
 
-        Task SendDataAsync(byte[] data);
+        Task SendDataAsync(byte[] data, CancellationToken cancellationToken);
+
+#if NETSTANDARD2_1
+        [BlockCaller]
+        Task SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken);
+#endif
     }
 }

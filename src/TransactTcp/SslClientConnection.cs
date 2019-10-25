@@ -23,7 +23,7 @@ namespace TransactTcp
             Action<IConnection, AuthenticationException> onAuthenticationException = null) 
             : base(connectionEndPoint, localEndPoint)
         {
-            _sslConnectionSettings = connectionEndPoint.SslConnectionSettings;
+            _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? SslConnectionSettings.Default;
             _onAuthenticationException = onAuthenticationException;
         }
 

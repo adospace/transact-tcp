@@ -31,42 +31,40 @@ namespace TransactTcp
             _tcpClient = _localEndPoint == null ? new TcpClient() : new TcpClient(_localEndPoint);
             var cancellationCompletionSource = new TaskCompletionSource<bool>();
 
-            using (var reconnectionDelayEvent = new AutoResetEvent(false))
+            using var reconnectionDelayEvent = new AutoResetEvent(false);
+            while (true)
             {
-                while (true)
+                try
                 {
-                    try
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var connectTask = _tcpClient.ConnectAsync(_endPoint.Address, _endPoint.Port);
+
+                    using (cancellationToken.Register(() =>
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        var connectTask = _tcpClient.ConnectAsync(_endPoint.Address, _endPoint.Port);
-
-                        using (cancellationToken.Register(() =>
-                        {
-                            reconnectionDelayEvent.Set();
-                            cancellationCompletionSource.TrySetResult(true);
-                        }))
-                        {
-                            if (connectTask != await Task.WhenAny(connectTask, cancellationCompletionSource.Task))
-                            {
-                                throw new OperationCanceledException(cancellationToken);
-                            }
-                        }
-
-                        if (!connectTask.IsFaulted)
-                        {
-                            _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
-                            _connectedStream = await CreateConnectedStreamAsync(_tcpClient, cancellationToken);
-                            break;
-                        }
-
-                        if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelayMilliseconds))
-                            break;
-                    }
-                    catch (OperationCanceledException)
+                        reconnectionDelayEvent.Set();
+                        cancellationCompletionSource.TrySetResult(true);
+                    }))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        if (connectTask != await Task.WhenAny(connectTask, cancellationCompletionSource.Task))
+                        {
+                            throw new OperationCanceledException(cancellationToken);
+                        }
                     }
+
+                    if (!connectTask.IsFaulted)
+                    {
+                        _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+                        _connectedStream = await CreateConnectedStreamAsync(_tcpClient, cancellationToken);
+                        break;
+                    }
+
+                    if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelayMilliseconds))
+                        break;
+                }
+                catch (OperationCanceledException)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
             }
         }

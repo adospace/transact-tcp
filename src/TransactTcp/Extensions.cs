@@ -33,6 +33,31 @@ namespace TransactTcp
             }
         }
 
+#if NETSTANDARD2_1
+        internal static Task ReadBufferedAsync(this Stream stream, Memory<byte> buffer, CancellationToken cancellationToken)
+            => ReadBufferedAsync(stream, buffer, 0, buffer.Length, cancellationToken);
+
+        internal static async Task ReadBufferedAsync(this Stream stream, Memory<byte> buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            if (stream is null)
+            {
+                throw new ArgumentNullException(nameof(stream));
+            }
+
+            while (count > 0)
+            {
+                var bytesRead = await stream.ReadAsync(buffer.Slice(offset, count), cancellationToken);
+                if (bytesRead == 0)
+                {
+                    throw new InvalidOperationException("Unable to read bytes from network stream");
+                }
+
+                offset += bytesRead;
+                count -= bytesRead;
+            }
+        }
+#endif
+
         internal static void ReadBuffered(this Stream stream, byte[] buffer, int offset, int count)
         {
             if (stream is null)
@@ -74,5 +99,12 @@ namespace TransactTcp
             connection.Stop();
             connection.Start();        
         }
+
+        public static Task SendDataAsync(this IConnection connection, byte[] data)
+            => connection.SendDataAsync(data, CancellationToken.None);
+#if NETSTANDARD2_1
+        public static Task SendDataAsync(this IConnection connection, Memory<byte> memoryBuffer)
+            => connection.SendDataAsync(memoryBuffer, CancellationToken.None);
+#endif
     }
 }

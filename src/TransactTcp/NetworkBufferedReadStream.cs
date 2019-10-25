@@ -58,7 +58,14 @@ namespace TransactTcp
             _position += count;
             return count;
         }
-
+#if NETSTANDARD2_1
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            await _innerStream.ReadBufferedAsync(buffer, cancellationToken);
+            _position += buffer.Length;
+            return buffer.Length;
+        }
+#endif
         public override long Seek(long offset, SeekOrigin origin)
         {
             throw new NotSupportedException();

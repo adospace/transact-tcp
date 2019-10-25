@@ -1,6 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shouldly;
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -286,12 +287,12 @@ namespace TransactTcp.Tests
             using var receivedFromServerEvent = new AutoResetEvent(false);
 
             client.Start(
-                receivedAction: (c, data) => 
+                receivedAction: (c, data) =>
                 {
                     if (System.Text.Encoding.UTF8.GetString(data) == "SENT FROM SERVER")
-                        receivedFromServerEvent.Set();                
+                        receivedFromServerEvent.Set();
                 },
-                connectionStateChangedAction: (c, fromState, toState)=> { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
+                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
                 );
 
             server.Start(
@@ -308,6 +309,48 @@ namespace TransactTcp.Tests
             await client.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT"));
             await server.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER"));
 
+
+            WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 4000).ShouldBeTrue();
+        }
+
+        [TestMethod]
+        public async Task SendMessagesUsingMemoryBuffer()
+        {
+            using var server = ConnectionFactory.CreateServer(15000);
+
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+
+            using var serverConnectedEvent = new AutoResetEvent(false);
+            using var clientConnectedEvent = new AutoResetEvent(false);
+            using var receivedFromClientEvent = new AutoResetEvent(false);
+            using var receivedFromServerEvent = new AutoResetEvent(false);
+
+            client.Start(
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
+                    await stream.ReadAsync(memoryOwner.Memory, cancellationToken);
+                    if (System.Text.Encoding.UTF8.GetString(memoryOwner.Memory.Span) == "SENT FROM SERVER")
+                        receivedFromServerEvent.Set();
+                },
+                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
+                );
+
+            server.Start(
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
+                    await stream.ReadAsync(memoryOwner.Memory, cancellationToken);
+                    if (System.Text.Encoding.UTF8.GetString(memoryOwner.Memory.Span) == "SENT FROM CLIENT")
+                        receivedFromClientEvent.Set();
+                },
+                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
+                );
+
+            WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 4000).ShouldBeTrue();
+
+            await client.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT")));
+            await server.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER")));
 
             WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 4000).ShouldBeTrue();
         }
