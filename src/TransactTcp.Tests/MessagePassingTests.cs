@@ -351,8 +351,10 @@ namespace TransactTcp.Tests
 
             await client.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT")));
             await server.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER")));
+            //await client.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT"));
+            //await server.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER"));
 
-            WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 4000).ShouldBeTrue();
+            WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 10000).ShouldBeTrue();
         }
     }
 }

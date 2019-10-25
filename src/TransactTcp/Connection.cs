@@ -43,12 +43,15 @@ namespace TransactTcp
             _connectionSettings = connectionSettings ?? ConnectionSettings.Default;
             _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
-            _connectionStateMachine.OnTransitioned((transition) => 
+            _connectionStateMachine.OnTransitioned((transition) =>
                 _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination));
+        }
 
+        protected virtual void ConfigureStateMachine(StateMachine<ConnectionState, ConnectionTrigger> stateMachine)
+        {
             _connectionStateMachine.Configure(ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
-                .OnEntryFrom(ConnectionTrigger.Disconnect, ()=>
+                .OnEntryFrom(ConnectionTrigger.Disconnect, () =>
                 {
                     OnDisconnect();
                 });
@@ -96,6 +99,7 @@ namespace TransactTcp
                     OnDisconnect();
                     Task.Run(OnConnectAsyncCore);
                 });
+
         }
 
         private void SendKeepAliveLoopAsync()
@@ -310,8 +314,8 @@ namespace TransactTcp
 
                 try
                 {
-                
-                    await _connectedStream?.WriteAsync(memoryBufferOwner.Memory, cancellationToken).AsTask();
+
+                    await _connectedStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
                     await _connectedStream?.WriteAsync(data, cancellationToken).AsTask();
                 }
                 catch (Exception)
