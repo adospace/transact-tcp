@@ -26,15 +26,6 @@ namespace TransactTcp
             _localEndPoint = localEndPoint;
         }
 
-        //protected override void ConfigureStateMachine()
-        //{
-        //    base.ConfigureStateMachine();
-
-        //    _connectionStateMachine.Configure(ConnectionState.Disconnected)
-        //        .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
-        //        ;
-        //}
-
         protected override bool IsStreamConnected => (_tcpClient?.Connected).GetValueOrDefault();
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)

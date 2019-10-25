@@ -58,7 +58,6 @@ namespace TransactTcp.Tests
             await client.SendDataAsync(new byte[messageSize]);
 
             serverReceivedDataEvent.WaitOne(10000).ShouldBeTrue();
-
         }
 
         [TestMethod]
@@ -105,7 +104,6 @@ namespace TransactTcp.Tests
             await client.SendDataAsync(new byte[currentMessageSize = 120]);
 
             serverReceivedDataEvent.WaitOne(10000).ShouldBeTrue();
-
         }
 
         [TestMethod]
@@ -255,7 +253,6 @@ namespace TransactTcp.Tests
                 WaitHandle.WaitAll(new[] { errorsOnServerSideEvent, errorsOnClientSideEvent }, 2000).ShouldBeFalse();
 
                 cancellationTokenSource.Cancel();
-
             }
             finally
             {
@@ -360,16 +357,19 @@ namespace TransactTcp.Tests
         [TestMethod]
         public async Task ConnectionListenerShouldAcceptNewConnection()
         {
-            using var multiPeerServer = ConnectionFactory.CreateMultiPeerServer(15000);
+            using var multiPeerServer = ConnectionFactory.CreateMultiPeerServer(14000);
 
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 14000);
 
             using var serverConnectedEvent = new AutoResetEvent(false);
             using var clientConnectedEvent = new AutoResetEvent(false);
             using var receivedBackFromServerEvent = new AutoResetEvent(false);
 
-            multiPeerServer.Start((listener, newConnection) =>
+            IConnection newConnection = null;
+
+            multiPeerServer.Start((listener, c) =>
             {
+                newConnection = c;
                 newConnection.Start(
                     receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
                     {

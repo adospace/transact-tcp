@@ -13,7 +13,7 @@ namespace TransactTcp
     internal class ServerConnection : Connection
     {
         protected TcpClient _tcpToClient;
-        private IPEndPoint _localEndPoint;
+        private readonly IPEndPoint _localEndPoint;
 
         public ServerConnection(
            ConnectionEndPoint connectionEndPoint) 
@@ -21,24 +21,6 @@ namespace TransactTcp
         {
             _localEndPoint = connectionEndPoint.LocalEndPoint ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPoint");
         }
-
-        //protected override void ConfigureStateMachine()
-        //{
-        //    base.ConfigureStateMachine();
-
-        //    _connectionStateMachine.Configure(ConnectionState.Disconnected)
-        //        .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
-        //        ;
-
-        //    _connectionStateMachine.Configure(ConnectionState.LinkError)
-        //        .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
-        //        .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
-        //        .OnEntryFrom(ConnectionTrigger.LinkError, () =>
-        //        {
-        //            OnDisconnect();
-        //            Task.Run(OnConnectAsyncCore);
-        //        });
-        //}
 
         protected override bool IsStreamConnected => (_tcpToClient?.Connected).GetValueOrDefault();
 
@@ -67,6 +49,11 @@ namespace TransactTcp
                     cancellationToken.ThrowIfCancellationRequested();
                     throw;
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(ex);
+                }
+
                 finally
                 {
                     tcpListener.Stop();

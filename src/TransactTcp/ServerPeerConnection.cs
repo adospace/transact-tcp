@@ -20,16 +20,6 @@ namespace TransactTcp
             _connectionSettings.AutoReconnect = false;
         }
 
-        //protected override void ConfigureStateMachine()
-        //{
-        //    base.ConfigureStateMachine();
-
-        //    _connectionStateMachine.Configure(ConnectionState.Disconnected)
-        //        .Permit(ConnectionTrigger.Connect, ConnectionState.Connected)
-        //        ;
-        //}
-
-
         protected override bool IsStreamConnected => (_tcpToClient?.Connected).GetValueOrDefault();
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)

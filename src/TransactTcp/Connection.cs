@@ -41,7 +41,16 @@ namespace TransactTcp
             _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
             _connectionStateMachine.OnTransitioned((transition) =>
-                _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination));
+            {
+                try
+                {
+                    _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"({GetType()}){Environment.NewLine}{ex}");
+                }
+            });
 
             ConfigureStateMachine();
         }
@@ -197,8 +206,14 @@ namespace TransactTcp
             catch (OperationCanceledException)
             {
             }
+#if DEBUG
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
+#else
             catch (Exception)
             {
+#endif                
                 _receiveLoopCancellationTokenSource = null;
 
                 ServiceRef.Call(this, () =>
@@ -257,8 +272,14 @@ namespace TransactTcp
             catch (OperationCanceledException)
             {
             }
+#if DEBUG
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
+#else
             catch (Exception)
             {
+#endif                
                 _connectCancellationTokenSource = null;
 
                 ServiceRef.Call(this, () =>

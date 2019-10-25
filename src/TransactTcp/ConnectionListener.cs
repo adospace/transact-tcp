@@ -57,8 +57,14 @@ namespace TransactTcp
                                 _connectionCreatedAction.Invoke(this,
                                     ServiceRef.Create<IConnection>(new ServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
                             }
+#if DEBUG
+                            catch (InvalidOperationException ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
+#else
                             catch (InvalidOperationException)
                             {
+#endif
                                 _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
                                 throw;
                             }

@@ -30,8 +30,8 @@ namespace TransactTcp.Tests
                     clientStateChangedEvent.Set();
             });
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            serverStateChangedEvent.WaitOne(100000).ShouldBeTrue();
+            clientStateChangedEvent.WaitOne(100000).ShouldBeTrue();
 
             server.State.ShouldBe(ConnectionState.Connected);
             client.State.ShouldBe(ConnectionState.Connected);

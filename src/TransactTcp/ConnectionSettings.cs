@@ -13,7 +13,7 @@ namespace TransactTcp
         public ConnectionSettings(
             int keepAliveMilliseconds = 500,
             int reconnectionDelayMilliseconds = 1000,
-            bool autoReconnect = false
+            bool autoReconnect = true
             )
         {
             if (keepAliveMilliseconds <= 0)
