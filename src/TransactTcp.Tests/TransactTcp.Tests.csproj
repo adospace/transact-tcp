@@ -16,10 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="coveralls.io" Version="1.4.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="1.4.0" />
     <PackageReference Include="MSTest.TestFramework" Version="1.4.0" />
     <PackageReference Include="coverlet.collector" Version="1.0.1" />
+    <PackageReference Include="OpenCover" Version="4.7.922" />
     <PackageReference Include="Shouldly" Version="3.0.2" />
     <PackageReference Include="ToxiproxyNetCore" Version="1.0.3" />
   </ItemGroup>
