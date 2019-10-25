@@ -11,7 +11,7 @@ namespace TransactTcp.Demo
             if (args == null ||
                 args.Length != 1)
             {
-                Console.WriteLine("Please run dotnet Transact.Demo.dll -server|-client");
+                Console.WriteLine("Please run TransactTcp.Demo -server|-client");
                 return;
             }
 
@@ -21,7 +21,7 @@ namespace TransactTcp.Demo
                 RunClient();
             else
             {
-                Console.WriteLine("Please run dotnet Transact.Demo.dll -server|-client");
+                Console.WriteLine("Please run Transact.Demo -server|-client");
             }
         }
 

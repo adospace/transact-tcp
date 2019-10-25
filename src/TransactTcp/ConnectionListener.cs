@@ -57,7 +57,7 @@ namespace TransactTcp
                                 _connectionCreatedAction.Invoke(this,
                                     ServiceRef.Create<IConnection>(new ServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
                             }
-                            catch (InvalidOperationException ex)
+                            catch (InvalidOperationException)
                             {
                                 _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
                                 throw;
@@ -74,7 +74,7 @@ namespace TransactTcp
             catch (OperationCanceledException)
             {
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //_listeningLoopCancellationTokenSource?.Cancel(); //-> call to Register(() => tcpListener.Stop()))
                 //_listeningLoopCancellationTokenSource = null;

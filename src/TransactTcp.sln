@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactTcp.Tests", "Transa
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactTcp.Demo", "TransactTcp.Demo\TransactTcp.Demo.csproj", "{8239D630-F227-4597-B60E-9D6F22283BD5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TransactTcp.ChatDemo", "TransactTcp.ChatDemo\TransactTcp.ChatDemo.csproj", "{62B4A395-188B-49D1-91D1-CCEF8775CF4C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{8239D630-F227-4597-B60E-9D6F22283BD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8239D630-F227-4597-B60E-9D6F22283BD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8239D630-F227-4597-B60E-9D6F22283BD5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{62B4A395-188B-49D1-91D1-CCEF8775CF4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{62B4A395-188B-49D1-91D1-CCEF8775CF4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{62B4A395-188B-49D1-91D1-CCEF8775CF4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{62B4A395-188B-49D1-91D1-CCEF8775CF4C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
