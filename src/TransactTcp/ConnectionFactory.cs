@@ -89,5 +89,17 @@ namespace TransactTcp
         public static IConnection CreateRedundantClient(IPAddress[] remoteAddresses, int remotePort, ConnectionSettings connectionSettings = null)
             => ServiceRef.Create<IConnection>(new RedundantConnection(remoteAddresses.Select(remoteAddress => CreateClient(remoteAddress, remotePort, connectionSettings: connectionSettings)).ToArray()));
 
+        public static IConnectionListener CreateMultiPeerServer(IPEndPoint localEndPoint, ConnectionListenerSettings settings = null)
+            => ServiceRef.Create<IConnectionListener>(new ConnectionListener(localEndPoint, settings));
+
+        public static IConnectionListener CreateMultiPeerServer(int localPort, ConnectionListenerSettings settings = null)
+            => CreateMultiPeerServer(new IPEndPoint(IPAddress.Any, localPort), settings);
+
+        public static IConnectionListener CreateMultiPeerServer(string localIp, int localPort, ConnectionListenerSettings settings = null)
+            => CreateMultiPeerServer(new IPEndPoint(IPAddress.Parse(localIp), localPort), settings);
+
+        public static IConnectionListener CreateMultiPeerServer(IPAddress localIp, int localPort, ConnectionListenerSettings settings = null)
+            => CreateMultiPeerServer(new IPEndPoint(localIp, localPort), settings);
+
     }
 }

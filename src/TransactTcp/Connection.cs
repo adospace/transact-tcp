@@ -15,7 +15,6 @@ namespace TransactTcp
 {
     internal abstract class Connection : IConnection
     {
-        protected IPEndPoint _endPoint;
         private Action<IConnection, byte[]> _receivedAction;
         private Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
         private Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> _receivedActionStreamAsync;
@@ -36,11 +35,9 @@ namespace TransactTcp
         private static readonly byte[] _keepAlivePacket = new byte[] { 0x0, 0x0, 0x0, 0x0 };
 
         protected Connection(
-            IPEndPoint endPoint,
             ConnectionSettings connectionSettings = null)
         {
-            _endPoint = endPoint ?? throw new ArgumentNullException(nameof(endPoint));
-            _connectionSettings = connectionSettings ?? ConnectionSettings.Default;
+            _connectionSettings = connectionSettings ?? new ConnectionSettings();
             _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
             _connectionStateMachine.OnTransitioned((transition) =>
@@ -99,7 +96,8 @@ namespace TransactTcp
                 .OnEntryFrom(ConnectionTrigger.LinkError, () =>
                 {
                     OnDisconnect();
-                    Task.Run(OnConnectAsyncCore);
+                    if (_connectionSettings.AutoReconnect)
+                        Task.Run(OnConnectAsyncCore);
                 });
         }
 

@@ -13,16 +13,27 @@ namespace TransactTcp
 {
     internal class ClientConnection : Connection
     {
+        private readonly IPEndPoint _remoteEndPoint;
         private readonly IPEndPoint _localEndPoint;
         private TcpClient _tcpClient;
 
         public ClientConnection(
             ConnectionEndPoint connectionEndPoint,
             IPEndPoint localEndPoint = null)
-            : base(connectionEndPoint.RemoteEndPoint, connectionEndPoint.ConnectionSettings)
+            : base(connectionEndPoint?.ConnectionSettings)
         {
+            _remoteEndPoint = connectionEndPoint.RemoteEndPoint ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPoint));
             _localEndPoint = localEndPoint;
         }
+
+        //protected override void ConfigureStateMachine()
+        //{
+        //    base.ConfigureStateMachine();
+
+        //    _connectionStateMachine.Configure(ConnectionState.Disconnected)
+        //        .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
+        //        ;
+        //}
 
         protected override bool IsStreamConnected => (_tcpClient?.Connected).GetValueOrDefault();
 
@@ -38,7 +49,7 @@ namespace TransactTcp
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var connectTask = _tcpClient.ConnectAsync(_endPoint.Address, _endPoint.Port);
+                    var connectTask = _tcpClient.ConnectAsync(_remoteEndPoint.Address, _remoteEndPoint.Port);
 
                     using (cancellationToken.Register(() =>
                     {

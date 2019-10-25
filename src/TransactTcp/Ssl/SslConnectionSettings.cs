@@ -56,7 +56,5 @@ namespace TransactTcp.Ssl
         public Func<object, X509Certificate, X509Chain, SslPolicyErrors, bool> SslValidateCertificateCallback { get; }
 
         public string SslServerHost { get; }
-
-        public static new SslConnectionSettings Default { get; } = new SslConnectionSettings();
     }
 }

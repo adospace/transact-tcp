@@ -12,7 +12,8 @@ namespace TransactTcp
     {
         public ConnectionSettings(
             int keepAliveMilliseconds = 500,
-            int reconnectionDelayMilliseconds = 1000
+            int reconnectionDelayMilliseconds = 1000,
+            bool autoReconnect = false
             )
         {
             if (keepAliveMilliseconds <= 0)
@@ -27,14 +28,13 @@ namespace TransactTcp
 
             KeepAliveMilliseconds = keepAliveMilliseconds;
             ReconnectionDelayMilliseconds = reconnectionDelayMilliseconds;
+            AutoReconnect = autoReconnect;
         }
-
-
-        public static ConnectionSettings Default { get; } = new ConnectionSettings();
 
         public int KeepAliveMilliseconds { get; }
 
         public int ReconnectionDelayMilliseconds { get; }
 
+        public bool AutoReconnect { get; internal set; }
     }
 }
