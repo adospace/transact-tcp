@@ -11,14 +11,14 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    internal class ClientConnection : Connection
+    internal class TcpClientConnection : Connection
     {
         private readonly IPEndPoint _remoteEndPoint;
         private readonly IPEndPoint _localEndPoint;
         private TcpClient _tcpClient;
 
-        public ClientConnection(
-            ConnectionEndPoint connectionEndPoint,
+        public TcpClientConnection(
+            TcpConnectionEndPoint connectionEndPoint,
             IPEndPoint localEndPoint = null)
             : base(connectionEndPoint?.ConnectionSettings)
         {
@@ -56,7 +56,6 @@ namespace TransactTcp
 
                     if (!connectTask.IsFaulted)
                     {
-                        _tcpClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
                         _connectedStream = await CreateConnectedStreamAsync(_tcpClient, cancellationToken);
                         break;
                     }

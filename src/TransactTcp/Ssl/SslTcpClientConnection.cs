@@ -1,24 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace TransactTcp.Ssl
 {
-    internal class SslServerConnection : ServerConnection
+    internal class SslTcpClientConnection : TcpClientConnection
     {
         private readonly SslConnectionSettings _sslConnectionSettings;
         private readonly Action<IConnection, AuthenticationException> _onAuthenticationException;
 
-        public SslServerConnection(
-            SslConnectionEndPoint connectionEndPoint,
+        public SslTcpClientConnection(
+            SslTcpConnectionEndPoint connectionEndPoint,
+            IPEndPoint localEndPoint = null,
             Action<IConnection, AuthenticationException> onAuthenticationException = null)
-            : base(connectionEndPoint)
+            : base(connectionEndPoint, localEndPoint)
         {
             _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? new SslConnectionSettings();
             _onAuthenticationException = onAuthenticationException;
@@ -27,16 +30,16 @@ namespace TransactTcp.Ssl
         protected override async Task<Stream> CreateConnectedStreamAsync(TcpClient tcpClient, CancellationToken cancellationToken)
         {
             var sslStream = new SslStream(
-                _tcpToClient.GetStream(),
+                tcpClient.GetStream(),
                 true,
                 _sslConnectionSettings.SslValidateCertificateCallback == null ? null : new RemoteCertificateValidationCallback(_sslConnectionSettings.SslValidateCertificateCallback),
                 null);
 
             try
             {
-                await sslStream.AuthenticateAsServerAsync(
-                    _sslConnectionSettings.SslCertificate,
-                    _sslConnectionSettings.SslClientCertificateRequired,
+                await sslStream.AuthenticateAsClientAsync(
+                    _sslConnectionSettings.SslServerHost,
+                    _sslConnectionSettings.SslCertificate == null ? null : new X509CertificateCollection(new[] { _sslConnectionSettings.SslCertificate }),
                     _sslConnectionSettings.SslEnabledProtocols,
                     _sslConnectionSettings.SslCheckCertificateRevocation);
             }

@@ -5,15 +5,15 @@ using System.Text;
 
 namespace TransactTcp.Ssl
 {
-    public class SslConnectionEndPoint : ConnectionEndPoint
+    public class SslTcpConnectionEndPoint : TcpConnectionEndPoint
     {
-        public SslConnectionEndPoint(IPEndPoint localEndPoint = null, IPEndPoint remoteEndPoint = null, SslConnectionSettings connectionSettings = null)
+        public SslTcpConnectionEndPoint(IPEndPoint localEndPoint = null, IPEndPoint remoteEndPoint = null, SslConnectionSettings connectionSettings = null)
             : base(localEndPoint, remoteEndPoint, connectionSettings)
         {
             SslConnectionSettings = connectionSettings;
         }
 
-        public SslConnectionEndPoint(IPAddress localAddress, int localPort, IPAddress remoteAddress, int remotePort, SslConnectionSettings connectionSettings = null)
+        public SslTcpConnectionEndPoint(IPAddress localAddress, int localPort, IPAddress remoteAddress, int remotePort, SslConnectionSettings connectionSettings = null)
             : base(localAddress, localPort, remoteAddress, remotePort, connectionSettings)
         {
             SslConnectionSettings = connectionSettings;

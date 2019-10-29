@@ -55,7 +55,7 @@ namespace TransactTcp
                                 var tcpToClient = await tcpListener.AcceptTcpClientAsync();
 
                                 _connectionCreatedAction.Invoke(this,
-                                    ServiceRef.Create<IConnection>(new ServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
+                                    ServiceRef.Create<IConnection>(new TcpServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
                             }
 #if DEBUG
                             catch (InvalidOperationException ex)

@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    internal class ServerPeerConnection : Connection
+    internal class TcpServerPeerConnection : Connection
     {
         private readonly TcpClient _tcpToClient;
 
-        public ServerPeerConnection(TcpClient tcpToClient, ConnectionSettings connectionSettings = null) 
+        public TcpServerPeerConnection(TcpClient tcpToClient, ConnectionSettings connectionSettings = null) 
             : base(connectionSettings)
         {
             _tcpToClient = tcpToClient;

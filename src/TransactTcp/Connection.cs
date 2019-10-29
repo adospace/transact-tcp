@@ -119,6 +119,8 @@ namespace TransactTcp
                 {
                     _sendKeepAliveTaskIsRunningEvent.Set();
 
+                    _connectedStream.ReadTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+
                     while (true)
                     {
                         if (!_sendKeepAliveResetEvent.WaitOne(_connectionSettings.KeepAliveMilliseconds))

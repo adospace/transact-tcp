@@ -10,13 +10,13 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    internal class ServerConnection : Connection
+    internal class TcpServerConnection : Connection
     {
         protected TcpClient _tcpToClient;
         private readonly IPEndPoint _localEndPoint;
 
-        public ServerConnection(
-           ConnectionEndPoint connectionEndPoint) 
+        public TcpServerConnection(
+           TcpConnectionEndPoint connectionEndPoint) 
             : base(connectionEndPoint?.ConnectionSettings)
         {
             _localEndPoint = connectionEndPoint.LocalEndPoint ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPoint");
@@ -60,7 +60,6 @@ namespace TransactTcp
                 }
             }
 
-            _tcpToClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
             _connectedStream = await CreateConnectedStreamAsync(_tcpToClient, cancellationToken);
         }
 
