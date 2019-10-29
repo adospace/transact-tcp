@@ -42,13 +42,5 @@ namespace TransactTcp
 
             _connectedStream = _pipeClient;
         }
-
-        protected override void OnDisconnect()
-        {
-            base.OnDisconnect();
-
-            _pipeClient?.Close();
-            _pipeClient = null;
-        }
     }
 }
