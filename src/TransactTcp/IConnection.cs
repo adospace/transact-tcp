@@ -1,5 +1,6 @@
 ﻿using ServiceActor;
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,7 +10,7 @@ namespace TransactTcp
     {
         void Start(Action<IConnection, byte[]> receivedAction = null,
             Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null,
-            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync = null,
+            Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync = null,
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null);
 
         void Stop();

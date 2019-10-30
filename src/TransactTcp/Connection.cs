@@ -119,7 +119,8 @@ namespace TransactTcp
                 {
                     _sendKeepAliveTaskIsRunningEvent.Set();
 
-                    _connectedStream.ReadTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+                    if (_connectedStream.CanTimeout)
+                        _connectedStream.ReadTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
 
                     while (true)
                     {
@@ -141,8 +142,14 @@ namespace TransactTcp
             catch (OperationCanceledException)
             {
             }
+#if DEBUG
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+#else
             catch (Exception)
             {
+#endif
                 _sendKeepAliveLoopCancellationTokenSource = null;
                 _sendKeepAliveResetEvent = null;
                 
@@ -175,9 +182,9 @@ namespace TransactTcp
                     var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                     while (true)
                     {
-                        await _connectedStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
-
                         cancellationToken.ThrowIfCancellationRequested();
+
+                        await _connectedStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
 
                         var messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
                         if (messageLength == 0)
@@ -299,7 +306,6 @@ namespace TransactTcp
         protected abstract Task OnConnectAsync(CancellationToken cancellationToken);
 
         public ConnectionState State { get => _connectionStateMachine.State; }
-
         public async Task SendDataAsync(byte[] data, CancellationToken cancellationToken)
         {
             if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
@@ -350,7 +356,7 @@ namespace TransactTcp
 
         public virtual void Start(Action<IConnection, byte[]> receivedAction = null,
             Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null,
-            Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync = null,
+            Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync = null,
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null)
         {
             _receivedAction = receivedAction ?? _receivedAction;

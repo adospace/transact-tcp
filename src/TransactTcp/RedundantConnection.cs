@@ -3,6 +3,7 @@ using Stateless;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -14,7 +15,7 @@ namespace TransactTcp
     {
         private Action<IConnection, byte[]> _receivedAction;
         private Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
-        private Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> _receivedActionStreamAsync;
+        private Func<IConnection, Stream, CancellationToken, Task> _receivedActionStreamAsync;
         private Action<IConnection, ConnectionState, ConnectionState> _connectionStateChangedAction;
         protected readonly StateMachine<ConnectionState, ConnectionTrigger> _connectionStateMachine;
 
@@ -111,7 +112,7 @@ namespace TransactTcp
                     _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
         }
 
-        private async Task OnReceivedDataFromChildChannel(IConnection connection, NetworkBufferedReadStream networkStream, CancellationToken cancellationToken)
+        private async Task OnReceivedDataFromChildChannel(IConnection connection, Stream networkStream, CancellationToken cancellationToken)
         {
             int messageCounter = BitConverter.ToInt32(await networkStream.ReadBytesAsync(4), 0);
 
@@ -203,7 +204,7 @@ namespace TransactTcp
         }
 #endif
 
-        public void Start(Action<IConnection, byte[]> receivedAction = null, Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null)
+        public void Start(Action<IConnection, byte[]> receivedAction = null, Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null, Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null)
         {
             _receivedAction = receivedAction ?? _receivedAction;
             _receivedActionAsync = receivedActionAsync ?? _receivedActionAsync;

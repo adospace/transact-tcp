@@ -61,9 +61,10 @@ namespace TransactTcp
 #if NETSTANDARD2_1
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
         {
-            await _innerStream.ReadBufferedAsync(buffer, cancellationToken);
-            _position += buffer.Length;
-            return buffer.Length;
+            var bufferToRead = buffer.Slice(0, (int)Math.Min(Length, buffer.Length));
+            await _innerStream.ReadBufferedAsync(bufferToRead, cancellationToken);
+            _position += bufferToRead.Length;
+            return bufferToRead.Length;
         }
 #endif
         public override long Seek(long offset, SeekOrigin origin)

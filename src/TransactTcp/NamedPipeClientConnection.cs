@@ -33,7 +33,7 @@ namespace TransactTcp
         {
             _pipeClient =
                     new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName,
-                        PipeDirection.InOut, PipeOptions.None,
+                        PipeDirection.InOut, PipeOptions.Asynchronous,
                         TokenImpersonationLevel.Impersonation);
 
             cancellationToken.ThrowIfCancellationRequested();

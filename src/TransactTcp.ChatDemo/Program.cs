@@ -33,7 +33,7 @@ namespace TransactTcp.ChatDemo
         {
             Console.WriteLine("Starting server...");
 
-            using var server = ConnectionFactory.CreateMultiPeerServer(15000);
+            using var server = TcpConnectionFactory.CreateMultiPeerServer(15000);
 
             server.Start(
                 connectionCreated: 
@@ -64,7 +64,7 @@ namespace TransactTcp.ChatDemo
 
         private static void RunClient()
         {
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
             client.Start(
                 receivedAction: (connection, data) => Console.WriteLine($"Message from server: {Encoding.UTF8.GetString(data)}"),

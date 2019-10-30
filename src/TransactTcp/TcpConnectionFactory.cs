@@ -10,7 +10,7 @@ using TransactTcp.Ssl;
 
 namespace TransactTcp
 {
-    public static class ConnectionFactory
+    public static class TcpConnectionFactory
     {
         public static IConnection CreateServer(TcpConnectionEndPoint connectionEndPoint)
             => ServiceRef.Create<IConnection>(new TcpServerConnection(connectionEndPoint));

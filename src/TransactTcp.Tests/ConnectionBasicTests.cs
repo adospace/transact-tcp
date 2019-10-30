@@ -14,9 +14,9 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = ConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15000);
 
-            var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -50,7 +50,7 @@ namespace TransactTcp.Tests
         public void CancelServerPendingConnectionShouldJustWork()
         {
             using var serverStateChangedEvent = new AutoResetEvent(false);
-            var server = ConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15000);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -68,7 +68,7 @@ namespace TransactTcp.Tests
         public void CancelClientPendingConnectionShouldJustWork()
         {
             using var clientStateChangedEvent = new AutoResetEvent(false);
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -88,10 +88,10 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = ConnectionFactory.CreateServer(
+            var server = TcpConnectionFactory.CreateServer(
                 15000);
 
-            var client = ConnectionFactory.CreateClient(
+            var client = TcpConnectionFactory.CreateClient(
                 IPAddress.Loopback,
                 15000);
 
@@ -129,9 +129,9 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = ConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15000);
 
-            var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -174,5 +174,44 @@ namespace TransactTcp.Tests
             client.State.ShouldBe(ConnectionState.Disconnected);
 
         }
+
+        [TestMethod]
+        public void NamedPipeServerAndClientShouldConnectAndDisconnectWithoutErrors()
+        {
+            using var serverStateChangedEvent = new AutoResetEvent(false);
+            using var clientStateChangedEvent = new AutoResetEvent(false);
+
+            var server = NamedPipeConnectionFactory.CreateServer("testpipe");
+
+            var client = NamedPipeConnectionFactory.CreateClient("testpipe");
+
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
+                    serverStateChangedEvent.Set();
+            });
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
+                    clientStateChangedEvent.Set();
+            });
+
+            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Connected);
+            client.State.ShouldBe(ConnectionState.Connected);
+
+            server.Stop();
+            client.Stop();
+
+            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Disconnected);
+            client.State.ShouldBe(ConnectionState.Disconnected);
+        }
+
     }
 }

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Toxiproxy.Net;
@@ -30,9 +31,9 @@ namespace TransactTcp.Tests
 
             const int messageSize = 1024 * 128; //128kb
 
-            using var server = ConnectionFactory.CreateServer(15000);
+            using var server = TcpConnectionFactory.CreateServer(15000);
 
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -70,9 +71,9 @@ namespace TransactTcp.Tests
 
             int currentMessageSize = -1;
 
-            using var server = ConnectionFactory.CreateServer(15001);
+            using var server = TcpConnectionFactory.CreateServer(15001);
 
-            using var client = ConnectionFactory.CreateClient(
+            using var client = TcpConnectionFactory.CreateClient(
                 IPAddress.Loopback,
                 15001);
 
@@ -148,8 +149,8 @@ namespace TransactTcp.Tests
 
                 await client.AddAsync(interface2Proxy);
 
-                using var serverConnection = ConnectionFactory.CreateRedundantServer(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12001), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 13001) });
-                using var clientConnection = ConnectionFactory.CreateRedundantClient(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12000), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 13000) });
+                using var serverConnection = TcpConnectionFactory.CreateRedundantServer(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12001), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 13001) });
+                using var clientConnection = TcpConnectionFactory.CreateRedundantClient(new[] { new IPEndPoint(IPAddress.Parse("127.0.0.1"), 12000), new IPEndPoint(IPAddress.Parse("127.0.0.1"), 13000) });
 
                 using var serverConnectedEvent = new AutoResetEvent(false);
                 using var clientConnectedEvent = new AutoResetEvent(false);
@@ -264,12 +265,12 @@ namespace TransactTcp.Tests
         public async Task ServerAndClientShouldJustWorkInSsl()
         {
 
-            using var server = ConnectionFactory.CreateSslServer(11000,
+            using var server = TcpConnectionFactory.CreateSslServer(11000,
                 new SslConnectionSettings(
                     sslCertificate: new X509Certificate(Utils.LoadResourceAsByteArray("transact-tcp_pfx"), "password")
                     ));
 
-            using var client = ConnectionFactory.CreateSslClient(IPAddress.Loopback, 11000, connectionSettings:
+            using var client = TcpConnectionFactory.CreateSslClient(IPAddress.Loopback, 11000, connectionSettings:
                 new SslConnectionSettings(
                     sslServerHost: "transact-tcp",
                     sslValidateServerCertificateCallback: (
@@ -314,9 +315,9 @@ namespace TransactTcp.Tests
         [TestMethod]
         public async Task SendMessagesUsingMemoryBuffer()
         {
-            using var server = ConnectionFactory.CreateServer(11001);
+            using var server = TcpConnectionFactory.CreateServer(11001);
 
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 11001);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 11001);
 
             using var serverConnectedEvent = new AutoResetEvent(false);
             using var clientConnectedEvent = new AutoResetEvent(false);
@@ -357,9 +358,9 @@ namespace TransactTcp.Tests
         [TestMethod]
         public async Task ConnectionListenerShouldAcceptNewConnection()
         {
-            using var multiPeerServer = ConnectionFactory.CreateMultiPeerServer(14000);
+            using var multiPeerServer = TcpConnectionFactory.CreateMultiPeerServer(14000);
 
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 14000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 14000);
 
             using var serverConnectedEvent = new AutoResetEvent(false);
             using var clientConnectedEvent = new AutoResetEvent(false);
@@ -401,6 +402,88 @@ namespace TransactTcp.Tests
             await client.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("PING")));
 
             WaitHandle.WaitAll(new[] { receivedBackFromServerEvent }, 100000).ShouldBeTrue();
+        }
+
+        [TestMethod]
+        public async Task NamedPipeConnectionPointPointShouldSendAndReceiveMessages()
+        {
+            using var serverConnectedEvent = new AutoResetEvent(false);
+            using var clientConnectedEvent = new AutoResetEvent(false);
+            using var serverDisconnectedEvent = new AutoResetEvent(false);
+            using var clientDisconnectedEvent = new AutoResetEvent(false);
+
+            var server = NamedPipeConnectionFactory.CreateServer("testpipe");
+            var client = NamedPipeConnectionFactory.CreateClient("testpipe");
+
+            using var serverReceivedMessageEvent = new AutoResetEvent(false);
+            using var clientReceivedMessageEvent = new AutoResetEvent(false);
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected)
+                    clientConnectedEvent.Set();
+                else if (toState == ConnectionState.Disconnected)
+                    clientDisconnectedEvent.Set();
+            },
+            receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+            {
+                using var sr = new StreamReader(stream, Encoding.UTF8);
+                if (await sr.ReadLineAsync() == "MESSAGE FROM SERVER")
+                    clientReceivedMessageEvent.Set();
+            });
+
+            //start server after client just to prove that it works
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected)
+                    serverConnectedEvent.Set();
+                else if (toState == ConnectionState.Disconnected)
+                    serverDisconnectedEvent.Set();
+            },
+            receivedActionStreamAsync: async (connection, stream, cancellationToken) => 
+            {
+                using var sr = new StreamReader(stream, Encoding.UTF8);
+                if (await sr.ReadLineAsync() == "MESSAGE FROM CLIENT")
+                    serverReceivedMessageEvent.Set();
+            });
+
+            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
+            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Connected);
+            client.State.ShouldBe(ConnectionState.Connected);
+
+            await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER\n"));
+            await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT\n"));
+
+            serverReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+            clientReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.Stop();
+            server.Start();
+
+            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
+            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Connected);
+            client.State.ShouldBe(ConnectionState.Connected);
+
+            await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER\n"));
+            await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT\n"));
+
+            serverReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+            clientReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.Stop();
+            client.Stop();
+
+            serverDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
+            clientDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Disconnected);
+            client.State.ShouldBe(ConnectionState.Disconnected);
+
+
         }
     }
 }

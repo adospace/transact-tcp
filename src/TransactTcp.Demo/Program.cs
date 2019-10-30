@@ -27,7 +27,7 @@ namespace TransactTcp.Demo
 
         private static void RunServer()
         {
-            using var server = ConnectionFactory.CreateServer(15000);
+            using var server = TcpConnectionFactory.CreateServer(15000);
 
             server.Start(
                 receivedAction: (connection, data) => Console.WriteLine($"Message from client: {Encoding.UTF8.GetString(data)}"),
@@ -38,7 +38,7 @@ namespace TransactTcp.Demo
 
         private static void RunClient()
         {
-            using var client = ConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
 
             client.Start(
                 receivedAction: (connection, data) => Console.WriteLine($"Message from server: {Encoding.UTF8.GetString(data)}"),

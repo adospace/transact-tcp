@@ -25,7 +25,7 @@ namespace TransactTcp
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
             _pipeServer =
-                new NamedPipeServerStream(_localEndPointName, PipeDirection.InOut, 1);
+                new NamedPipeServerStream(_localEndPointName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
             await _pipeServer.WaitForConnectionAsync(cancellationToken);
 
