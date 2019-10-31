@@ -17,7 +17,7 @@ namespace TransactTcp
     {
         private Action<IConnection, byte[]> _receivedAction;
         private Func<IConnection, byte[], CancellationToken, Task> _receivedActionAsync;
-        private Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> _receivedActionStreamAsync;
+        private Func<IConnection, Stream, CancellationToken, Task> _receivedActionStreamAsync;
         private Action<IConnection, ConnectionState, ConnectionState> _connectionStateChangedAction;
 
         protected readonly ConnectionSettings _connectionSettings;
@@ -197,22 +197,37 @@ namespace TransactTcp
 
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        if (_receivedActionStreamAsync != null)
+                        if (messageLength == -1)
                         {
-                            var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
-                            await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
-                            await bufferedStream.FlushAsync();
+                            if (_receivedActionStreamAsync != null)
+                            {
+                                var bufferedStream = new NetworkReadStream(_connectedStream);
+                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
+                            }
+                            else
+                            {
+                                throw new InvalidOperationException("ReceiveActionStreamAsync must be specified to handle variable length messages");
+                            }
                         }
                         else
                         {
-                            var messageBuffer = new byte[messageLength];
-                            
-                            await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
+                            if (_receivedActionStreamAsync != null)
+                            {
+                                var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
+                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
+                                await bufferedStream.FlushAsync();
+                            }
+                            else
+                            {
+                                var messageBuffer = new byte[messageLength];
 
-                            if (_receivedActionAsync != null)
-                                await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
-                            else //if (_receivedAction != null)
-                                _receivedAction(refToThis, messageBuffer);
+                                await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
+
+                                if (_receivedActionAsync != null)
+                                    await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
+                                else //if (_receivedAction != null)
+                                    _receivedAction(refToThis, messageBuffer);
+                            }
                         }
                     }
                 }
@@ -316,6 +331,11 @@ namespace TransactTcp
         public ConnectionState State { get => _connectionStateMachine.State; }
         public async Task SendDataAsync(byte[] data, CancellationToken cancellationToken)
         {
+            if (data == null)
+            {
+                throw new ArgumentNullException(nameof(data));
+            }
+
             if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
             {
                 _sendKeepAliveResetEvent?.Set();
@@ -333,6 +353,8 @@ namespace TransactTcp
                 }
             }
         }
+
+        private static readonly byte[] _nullLength = BitConverter.GetBytes(-1);
 
 #if NETSTANDARD2_1
         public async Task SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
@@ -362,6 +384,35 @@ namespace TransactTcp
         }
 #endif
 
+        public async Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken)
+        {
+            if (sendFunction == null)
+            {
+                throw new ArgumentNullException(nameof(sendFunction));
+            }
+
+            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
+            {
+                _sendKeepAliveResetEvent?.Set();
+
+                try
+                {
+                    await _connectedStream?.WriteAsync(_nullLength, 0, 4, cancellationToken);
+                    await sendFunction(_connectedStream, cancellationToken);
+                }
+#if DEBUG
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(ex);
+#else
+                catch (Exception)
+                {
+#endif
+                    _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                }
+            }
+        }
+
         public virtual void Start(Action<IConnection, byte[]> receivedAction = null,
             Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null,
             Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync = null,
@@ -386,7 +437,7 @@ namespace TransactTcp
                 _connectionStateMachine.Fire(ConnectionTrigger.Disconnect);
         }
 
-        #region IDisposable Support
+#region IDisposable Support
         private bool _disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -424,6 +475,6 @@ namespace TransactTcp
             // TODO: uncomment the following line if the finalizer is overridden above.
             // GC.SuppressFinalize(this);
         }
-        #endregion
+#endregion
     }
 }

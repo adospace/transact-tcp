@@ -15,7 +15,7 @@ namespace TransactTcp
 
         public NamedPipeServerConnection(
            NamedPipeConnectionEndPoint connectionEndPoint)
-            : base(connectionEndPoint?.ConnectionSettings)
+            : base(connectionEndPoint?.ConnectionSettings ?? new ConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
             _localEndPointName = connectionEndPoint.LocalEndPointName ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPointName");
         }
@@ -30,12 +30,6 @@ namespace TransactTcp
             await _pipeServer.WaitForConnectionAsync(cancellationToken);
 
             _connectedStream = _pipeServer;
-        }
-
-        protected override void OnDisconnect()
-        {
-            _pipeServer?.Close();
-            base.OnDisconnect();
         }
     }
 

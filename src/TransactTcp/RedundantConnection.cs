@@ -204,6 +204,25 @@ namespace TransactTcp
         }
 #endif
 
+        public async Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken)
+        {
+            if (_connectionStateMachine.State == ConnectionState.Connected)
+            {
+                _sentMessageCounter++;
+
+                var buffer = BitConverter.GetBytes(_sentMessageCounter);
+
+                foreach (var childConnection in _connections)
+                {
+                    await childConnection.SendAsync(async (childStream, childStreamCancellationToken) =>
+                    {
+                        await childStream.WriteAsync(buffer, 0, 4);
+                        await sendFunction(childStream, childStreamCancellationToken);
+                    }, cancellationToken);
+                }
+            }
+        }
+
         public void Start(Action<IConnection, byte[]> receivedAction = null, Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync = null, Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync = null, Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null)
         {
             _receivedAction = receivedAction ?? _receivedAction;

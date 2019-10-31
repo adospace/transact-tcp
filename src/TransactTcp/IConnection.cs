@@ -19,6 +19,8 @@ namespace TransactTcp
 
         Task SendDataAsync(byte[] data, CancellationToken cancellationToken);
 
+        Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken);
+
 #if NETSTANDARD2_1
         [BlockCaller]
         Task SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken);

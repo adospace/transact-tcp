@@ -418,33 +418,37 @@ namespace TransactTcp.Tests
             using var clientReceivedMessageEvent = new AutoResetEvent(false);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
-            {
-                if (toState == ConnectionState.Connected)
-                    clientConnectedEvent.Set();
-                else if (toState == ConnectionState.Disconnected)
-                    clientDisconnectedEvent.Set();
-            },
-            receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
-            {
-                using var sr = new StreamReader(stream, Encoding.UTF8);
-                if (await sr.ReadLineAsync() == "MESSAGE FROM SERVER")
-                    clientReceivedMessageEvent.Set();
-            });
+                {
+                    Debug.WriteLine($"Client state changed to {toState}");
+                    if (toState == ConnectionState.Connected)
+                        clientConnectedEvent.Set();
+                    else if (toState == ConnectionState.Disconnected)
+                        clientDisconnectedEvent.Set();
+                },
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    Debug.WriteLine($"Client received message");
+                    using var sr = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+                    if (await sr.ReadLineAsync() == "MESSAGE FROM SERVER")
+                        clientReceivedMessageEvent.Set();
+                });
 
             //start server after client just to prove that it works
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
-            {
-                if (toState == ConnectionState.Connected)
-                    serverConnectedEvent.Set();
-                else if (toState == ConnectionState.Disconnected)
-                    serverDisconnectedEvent.Set();
-            },
-            receivedActionStreamAsync: async (connection, stream, cancellationToken) => 
-            {
-                using var sr = new StreamReader(stream, Encoding.UTF8);
-                if (await sr.ReadLineAsync() == "MESSAGE FROM CLIENT")
-                    serverReceivedMessageEvent.Set();
-            });
+                {
+                    Debug.WriteLine($"Server state changed to {toState}");
+                    if (toState == ConnectionState.Connected)
+                        serverConnectedEvent.Set();
+                    else if (toState == ConnectionState.Disconnected)
+                        serverDisconnectedEvent.Set();
+                },
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) => 
+                {
+                    Debug.WriteLine($"Server received message");
+                    using var sr = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+                    if (await sr.ReadLineAsync() == "MESSAGE FROM CLIENT")
+                        serverReceivedMessageEvent.Set();
+                });
 
             serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
             clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
@@ -452,8 +456,16 @@ namespace TransactTcp.Tests
             server.State.ShouldBe(ConnectionState.Connected);
             client.State.ShouldBe(ConnectionState.Connected);
 
-            await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER\n"));
-            await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT\n"));
+            await server.SendDataAsync(async (stream, cancellationToken) =>
+            {
+                using var sw = new StreamWriter(stream, Encoding.UTF8, leaveOpen: true);
+                await sw.WriteLineAsync("MESSAGE FROM SERVER");
+            });
+            await client.SendDataAsync(async (stream, cancellationToken) =>
+            {
+                using var sw = new StreamWriter(stream, Encoding.UTF8, leaveOpen: true);
+                await sw.WriteLineAsync("MESSAGE FROM CLIENT");
+            });
 
             serverReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
             clientReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();

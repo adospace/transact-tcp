@@ -25,7 +25,7 @@ namespace TransactTcp
                 var bytesRead = await stream.ReadAsync(buffer, offset, count, cancellationToken);
                 if (bytesRead == 0)
                 {
-                    throw new InvalidOperationException("Unable to read bytes from network stream");
+                    throw new EndOfStreamException("Unable to read bytes from network stream");
                 }
 
                 offset += bytesRead;
@@ -49,7 +49,7 @@ namespace TransactTcp
                 var bytesRead = await stream.ReadAsync(buffer.Slice(offset, count), cancellationToken);
                 if (bytesRead == 0)
                 {
-                    throw new InvalidOperationException("Unable to read bytes from network stream");
+                    throw new EndOfStreamException("Unable to read bytes from network stream");
                 }
 
                 offset += bytesRead;
@@ -91,7 +91,7 @@ namespace TransactTcp
         public static void Start(this IConnection connection, Func<IConnection, byte[], CancellationToken, Task> receivedActionAsync)
             => connection.Start(receivedActionAsync: receivedActionAsync);
 
-        public static void Start(this IConnection connection, Func<IConnection, NetworkBufferedReadStream, CancellationToken, Task> receivedActionStreamAsync)
+        public static void Start(this IConnection connection, Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync)
             => connection.Start(receivedActionStreamAsync: receivedActionStreamAsync);
 
         public static void Restart(this IConnection connection)
@@ -106,5 +106,8 @@ namespace TransactTcp
         public static Task SendDataAsync(this IConnection connection, Memory<byte> memoryBuffer)
             => connection.SendDataAsync(memoryBuffer, CancellationToken.None);
 #endif
+        public static Task SendDataAsync(this IConnection connection, Func<Stream, CancellationToken, Task> sendFunction)
+            => connection.SendAsync(sendFunction, CancellationToken.None);
+
     }
 }

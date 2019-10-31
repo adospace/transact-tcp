@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    public class NetworkBufferedReadStream : Stream
+    internal class NetworkBufferedReadStream : Stream
     {
         private readonly Stream _innerStream;
 
