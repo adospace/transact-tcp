@@ -18,12 +18,11 @@ namespace TransactTcp
         private TcpClient _tcpClient;
 
         public TcpClientConnection(
-            TcpConnectionEndPoint connectionEndPoint,
-            IPEndPoint localEndPoint = null)
+            TcpConnectionEndPoint connectionEndPoint)
             : base(connectionEndPoint?.ConnectionSettings)
         {
             _remoteEndPoint = connectionEndPoint.RemoteEndPoint ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPoint));
-            _localEndPoint = localEndPoint;
+            _localEndPoint = connectionEndPoint.LocalEndPoint;
         }
 
         protected override bool IsStreamConnected => (_tcpClient?.Connected).GetValueOrDefault();

@@ -21,7 +21,7 @@ namespace TransactTcp
 
         public NamedPipeClientConnection(
             NamedPipeConnectionEndPoint connectionEndPoint)
-            : base(connectionEndPoint?.ConnectionSettings)
+            : base(connectionEndPoint?.ConnectionSettings ?? new ConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
             _remoteNamedPipeName = connectionEndPoint.RemoteEndPointName ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPointName));
             _remoteNamedPipeHost = connectionEndPoint.RemoteEndPointHost ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPointName));

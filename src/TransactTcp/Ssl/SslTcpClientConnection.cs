@@ -19,9 +19,8 @@ namespace TransactTcp.Ssl
 
         public SslTcpClientConnection(
             SslTcpConnectionEndPoint connectionEndPoint,
-            IPEndPoint localEndPoint = null,
             Action<IConnection, AuthenticationException> onAuthenticationException = null)
-            : base(connectionEndPoint, localEndPoint)
+            : base(connectionEndPoint)
         {
             _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? new SslConnectionSettings();
             _onAuthenticationException = onAuthenticationException;

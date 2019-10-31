@@ -80,13 +80,18 @@ namespace TransactTcp
                     using (_sendKeepAliveTaskIsRunningEvent = new AutoResetEvent(false))
                     {
                         _receiveLoopTask = Task.Run(ReceiveLoopAsync);
-                        _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
+                        if (_connectionSettings.KeepAliveMilliseconds > 0)
+                        {
+                            _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
+                        }
 
                         if (!_receiveLoopTaskIsRunningEvent.WaitOne())
                             throw new InvalidOperationException();
-
-                        if (!_sendKeepAliveTaskIsRunningEvent.WaitOne())
-                            throw new InvalidOperationException();
+                        if (_connectionSettings.KeepAliveMilliseconds > 0)
+                        {
+                            if (!_sendKeepAliveTaskIsRunningEvent.WaitOne())
+                                throw new InvalidOperationException();
+                        }
                     }
 
                     _receiveLoopTaskIsRunningEvent = null;
