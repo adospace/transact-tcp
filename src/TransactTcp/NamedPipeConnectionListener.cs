@@ -1,6 +1,7 @@
 ﻿using ServiceActor;
 using System;
 using System.Collections.Generic;
+using System.IO.Pipes;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -9,18 +10,25 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    public class ConnectionListener : IConnectionListener
+    public class NamedPipeConnectionListener : IConnectionListener
     {
-        private readonly IPEndPoint _localEndPoint;
+        private NamedPipeServerStream _pipeServer;
+        private readonly string _localEndPointName;
         private readonly ConnectionListenerSettings _settings;
         private CancellationTokenSource _listeningLoopCancellationTokenSource;
         private Task _listeningTask;
         private Action<IConnectionListener, IConnection> _connectionCreatedAction;
 
-        internal ConnectionListener(IPEndPoint localEndPoint, ConnectionListenerSettings settings = null)
+        internal NamedPipeConnectionListener(
+           string localEndPointName, ConnectionListenerSettings settings = null)
         {
-            _localEndPoint = localEndPoint ?? throw new ArgumentNullException(nameof(localEndPoint));
+            _localEndPointName = localEndPointName ?? throw new ArgumentNullException("localEndPointName");
             _settings = settings ?? new ConnectionListenerSettings();
+
+            if (string.IsNullOrWhiteSpace(localEndPointName))
+            {
+                throw new ArgumentException("Invalid pipename", nameof(localEndPointName));
+            }
         }
 
         public bool Listening { get => _listeningTask != null; }
@@ -39,42 +47,40 @@ namespace TransactTcp
 
         private async Task ListeningLoopCore()
         {
-            var tcpListener = new TcpListener(_localEndPoint);
+
             try
             {
-
-                tcpListener.Start(_settings.BackLog);
-                _listeningLoopCancellationTokenSource = new CancellationTokenSource();
+                while (true)
                 {
-                    while (true)
+                    _listeningLoopCancellationTokenSource = new CancellationTokenSource();
+
+                    try
                     {
-                        using (_listeningLoopCancellationTokenSource.Token.Register(() => tcpListener.Stop()))
-                        {
-                            try
-                            {
-                                var tcpToClient = await tcpListener.AcceptTcpClientAsync();
+                        _pipeServer =
+                            new NamedPipeServerStream(_localEndPointName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
-                                _connectionCreatedAction.Invoke(this,
-                                    ServiceRef.Create<IConnection>(new TcpServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
-                            }
-#if DEBUG
-                            catch (InvalidOperationException ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
-#else
-                            catch (InvalidOperationException)
-                            {
-#endif
-                                _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
-                                throw;
-                            }
-                            finally
-                            {
-                            }
-                        }
+                        await _pipeServer.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token);
 
-                        _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                        _connectionCreatedAction.Invoke(this,
+                            ServiceRef.Create<IConnection>(new NamedPipeServerPeerConnection(_pipeServer, _settings.NewConnectionSettings)));
                     }
+#if DEBUG
+                    catch (InvalidOperationException ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
+#else
+                    catch (InvalidOperationException)
+                    {
+#endif
+                        _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                        throw;
+                    }
+                    finally
+                    {
+                    }
+                    
+
+                    _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
                 }
             }
             catch (OperationCanceledException)
@@ -89,7 +95,7 @@ namespace TransactTcp
             }
             finally
             {
-                tcpListener.Stop();
+                _pipeServer?.Close();
                 //_listeningLoopCancellationTokenSource = null;
             }
         }
@@ -138,5 +144,6 @@ namespace TransactTcp
             // GC.SuppressFinalize(this);
         }
         #endregion
+
     }
 }

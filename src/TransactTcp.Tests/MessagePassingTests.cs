@@ -288,7 +288,7 @@ namespace TransactTcp.Tests
             client.Start(
                 receivedAction: (c, data) =>
                 {
-                    if (System.Text.Encoding.UTF8.GetString(data) == "SENT FROM SERVER")
+                    if (Encoding.UTF8.GetString(data) == "SENT FROM SERVER")
                         receivedFromServerEvent.Set();
                 },
                 connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
@@ -297,7 +297,7 @@ namespace TransactTcp.Tests
             server.Start(
                 receivedAction: (c, data) =>
                 {
-                    if (System.Text.Encoding.UTF8.GetString(data) == "SENT FROM CLIENT")
+                    if (Encoding.UTF8.GetString(data) == "SENT FROM CLIENT")
                         receivedFromClientEvent.Set();
                 },
                 connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
@@ -305,8 +305,8 @@ namespace TransactTcp.Tests
 
             WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 4000).ShouldBeTrue();
 
-            await client.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT"));
-            await server.SendDataAsync(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER"));
+            await client.SendDataAsync(Encoding.UTF8.GetBytes("SENT FROM CLIENT"));
+            await server.SendDataAsync(Encoding.UTF8.GetBytes("SENT FROM SERVER"));
 
 
             WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 4000).ShouldBeTrue();
@@ -329,7 +329,7 @@ namespace TransactTcp.Tests
                 {
                     using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
                     await stream.ReadAsync(memoryOwner.Memory, cancellationToken);
-                    if (System.Text.Encoding.UTF8.GetString(memoryOwner.Memory.Span) == "SENT FROM SERVER")
+                    if (Encoding.UTF8.GetString(memoryOwner.Memory.Span) == "SENT FROM SERVER")
                         receivedFromServerEvent.Set();
                 },
                 connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
@@ -340,7 +340,7 @@ namespace TransactTcp.Tests
                 {
                     using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
                     await stream.ReadAsync(memoryOwner.Memory, cancellationToken);
-                    if (System.Text.Encoding.UTF8.GetString(memoryOwner.Memory.Span) == "SENT FROM CLIENT")
+                    if (Encoding.UTF8.GetString(memoryOwner.Memory.Span) == "SENT FROM CLIENT")
                         receivedFromClientEvent.Set();
                 },
                 connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
@@ -348,12 +348,11 @@ namespace TransactTcp.Tests
 
             WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 4000).ShouldBeTrue();
 
-            await client.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("SENT FROM CLIENT")));
-            await server.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("SENT FROM SERVER")));
+            await client.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("SENT FROM CLIENT")));
+            await server.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("SENT FROM SERVER")));
 
             WaitHandle.WaitAll(new[] { receivedFromClientEvent, receivedFromServerEvent }, 10000).ShouldBeTrue();
         }
-
 
         [TestMethod]
         public async Task ConnectionListenerShouldAcceptNewConnection()
@@ -377,9 +376,9 @@ namespace TransactTcp.Tests
                         using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
                         var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
                         await stream.ReadAsync(buffer, cancellationToken);
-                        var pingString = System.Text.Encoding.UTF8.GetString(buffer.Span);
+                        var pingString = Encoding.UTF8.GetString(buffer.Span);
                         await connection.SendDataAsync(
-                            new Memory<byte>(System.Text.Encoding.UTF8.GetBytes($"SERVER RECEIVED: {pingString}")));
+                            new Memory<byte>(Encoding.UTF8.GetBytes($"SERVER RECEIVED: {pingString}")));
                     },
                     connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
                     );
@@ -391,7 +390,7 @@ namespace TransactTcp.Tests
                     using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
                     var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
                     await stream.ReadAsync(buffer, cancellationToken);
-                    if (System.Text.Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING")
+                    if (Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING")
                         receivedBackFromServerEvent.Set();
                 },
                 connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) clientConnectedEvent.Set(); }
@@ -399,7 +398,7 @@ namespace TransactTcp.Tests
 
             WaitHandle.WaitAll(new[] { clientConnectedEvent, serverConnectedEvent }, 40000).ShouldBeTrue();
 
-            await client.SendDataAsync(new Memory<byte>(System.Text.Encoding.UTF8.GetBytes("PING")));
+            await client.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING")));
 
             WaitHandle.WaitAll(new[] { receivedBackFromServerEvent }, 100000).ShouldBeTrue();
         }
@@ -484,6 +483,69 @@ namespace TransactTcp.Tests
             client.State.ShouldBe(ConnectionState.Disconnected);
 
 
+        }
+
+        [TestMethod]
+        public async Task NamedPipeConnectionListenerShouldAcceptNewConnection()
+        {
+            using var multiPeerServer = NamedPipeConnectionFactory.CreateMultiPeerServer("testpipe");
+
+            using var client1 = NamedPipeConnectionFactory.CreateClient("testpipe");
+            using var client2 = NamedPipeConnectionFactory.CreateClient("testpipe");
+
+            using var serverConnectedEvent = new AutoResetEvent(false);
+            using var client1ConnectedEvent = new AutoResetEvent(false);
+            using var client2ConnectedEvent = new AutoResetEvent(false);
+            using var receivedClient1BackFromServerEvent = new AutoResetEvent(false);
+            using var receivedClient2BackFromServerEvent = new AutoResetEvent(false);
+
+            multiPeerServer.Start((listener, c) =>
+            {
+                c.Start(
+                    receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                    {
+                        using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
+                        var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
+                        await stream.ReadAsync(buffer, cancellationToken);
+                        var pingString = Encoding.UTF8.GetString(buffer.Span);
+                        await connection.SendDataAsync(
+                            new Memory<byte>(Encoding.UTF8.GetBytes($"SERVER RECEIVED: {pingString}")));
+                    },
+                    connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
+                    );
+            });
+
+            client1.Start(
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
+                    var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
+                    await stream.ReadAsync(buffer, cancellationToken);
+                    if (Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING FROM CLIENT1")
+                        receivedClient1BackFromServerEvent.Set();
+                },
+                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) client1ConnectedEvent.Set(); }
+                );
+
+            client2.Start(
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
+                    var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
+                    await stream.ReadAsync(buffer, cancellationToken);
+                    if (Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING FROM CLIENT2")
+                        receivedClient2BackFromServerEvent.Set();
+                },
+                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) client2ConnectedEvent.Set(); }
+                );
+
+
+            WaitHandle.WaitAll(new[] { client1ConnectedEvent, client2ConnectedEvent, serverConnectedEvent }, 40000).ShouldBeTrue();
+
+            await client1.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT1")));
+            await client2.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT2")));
+
+            WaitHandle.WaitAll(new[] { receivedClient1BackFromServerEvent, receivedClient2BackFromServerEvent }, 100000).ShouldBeTrue();
         }
     }
 }

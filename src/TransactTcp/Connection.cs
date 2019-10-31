@@ -246,11 +246,14 @@ namespace TransactTcp
         {
             if (_receiveLoopTask != null)
             {
-                Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
+                if (_sendKeepAliveLoopTask == null)
+                    _receiveLoopTask.Wait();
+                else
+                    Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
                 System.Diagnostics.Debug.Assert(_receiveLoopCancellationTokenSource == null);
                 System.Diagnostics.Debug.Assert(_sendKeepAliveLoopCancellationTokenSource == null);
                 _receiveLoopTask.Dispose();
-                _sendKeepAliveLoopTask.Dispose();
+                _sendKeepAliveLoopTask?.Dispose();
                 _receiveLoopTask = null;
                 _sendKeepAliveLoopTask = null;
             }

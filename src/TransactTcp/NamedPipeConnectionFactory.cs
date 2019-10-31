@@ -22,5 +22,10 @@ namespace TransactTcp
 
         public static IConnection CreateClient(string remoteEndPointHost, string remoteEndPointName, ConnectionSettings connectionSettings = null)
             => CreateClient(new NamedPipeConnectionEndPoint(remoteEndPointHost: remoteEndPointHost,  remoteEndPointName: remoteEndPointName, connectionSettings: connectionSettings));
+
+
+        public static IConnectionListener CreateMultiPeerServer(string localNamedPipeName, ConnectionListenerSettings settings = null)
+            => ServiceRef.Create<IConnectionListener>(new NamedPipeConnectionListener(localNamedPipeName, settings));
+
     }
 }

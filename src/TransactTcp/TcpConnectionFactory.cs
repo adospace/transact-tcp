@@ -90,7 +90,7 @@ namespace TransactTcp
             => ServiceRef.Create<IConnection>(new RedundantConnection(remoteAddresses.Select(remoteAddress => CreateClient(remoteAddress, remotePort, connectionSettings: connectionSettings)).ToArray()));
 
         public static IConnectionListener CreateMultiPeerServer(IPEndPoint localEndPoint, ConnectionListenerSettings settings = null)
-            => ServiceRef.Create<IConnectionListener>(new ConnectionListener(localEndPoint, settings));
+            => ServiceRef.Create<IConnectionListener>(new TcpConnectionListener(localEndPoint, settings));
 
         public static IConnectionListener CreateMultiPeerServer(int localPort, ConnectionListenerSettings settings = null)
             => CreateMultiPeerServer(new IPEndPoint(IPAddress.Any, localPort), settings);
