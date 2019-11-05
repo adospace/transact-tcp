@@ -106,7 +106,7 @@ namespace TransactTcp
         public static Task SendDataAsync(this IConnection connection, Memory<byte> memoryBuffer)
             => connection.SendDataAsync(memoryBuffer, CancellationToken.None);
 #endif
-        public static Task SendDataAsync(this IConnection connection, Func<Stream, CancellationToken, Task> sendFunction)
+        public static Task SendAsync(this IConnection connection, Func<Stream, CancellationToken, Task> sendFunction)
             => connection.SendAsync(sendFunction, CancellationToken.None);
 
     }
