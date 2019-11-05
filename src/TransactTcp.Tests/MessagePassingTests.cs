@@ -456,12 +456,12 @@ namespace TransactTcp.Tests
             server.State.ShouldBe(ConnectionState.Connected);
             client.State.ShouldBe(ConnectionState.Connected);
 
-            await server.SendDataAsync(async (stream, cancellationToken) =>
+            await server.SendAsync(async (stream, cancellationToken) =>
             {
                 using var sw = new StreamWriter(stream, Encoding.UTF8, leaveOpen: true);
                 await sw.WriteLineAsync("MESSAGE FROM SERVER");
             });
-            await client.SendDataAsync(async (stream, cancellationToken) =>
+            await client.SendAsync(async (stream, cancellationToken) =>
             {
                 using var sw = new StreamWriter(stream, Encoding.UTF8, leaveOpen: true);
                 await sw.WriteLineAsync("MESSAGE FROM CLIENT");

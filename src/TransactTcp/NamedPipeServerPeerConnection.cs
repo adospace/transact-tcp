@@ -14,8 +14,10 @@ namespace TransactTcp
     {
         private readonly NamedPipeServerStream _pipeConnectedWithClient;
 
-        public NamedPipeServerPeerConnection(NamedPipeServerStream pipeConnectedWithClient, ConnectionSettings connectionSettings = null) 
-            : base(connectionSettings)
+        public NamedPipeServerPeerConnection(
+            NamedPipeServerStream pipeConnectedWithClient, 
+            ConnectionSettings connectionSettings = null) 
+            : base(connectionSettings ?? new ConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
             _pipeConnectedWithClient = pipeConnectedWithClient;
             _connectionSettings.AutoReconnect = false;
