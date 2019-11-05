@@ -13,6 +13,7 @@ namespace TransactTcp
             Func<IConnection, Stream, CancellationToken, Task> receivedActionStreamAsync = null,
             Action<IConnection, ConnectionState, ConnectionState> connectionStateChangedAction = null);
 
+        [BlockCaller]
         void Stop();
 
         ConnectionState State { get; }

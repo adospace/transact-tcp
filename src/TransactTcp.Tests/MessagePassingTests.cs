@@ -413,8 +413,8 @@ namespace TransactTcp.Tests
             using var serverDisconnectedEvent = new AutoResetEvent(false);
             using var clientDisconnectedEvent = new AutoResetEvent(false);
 
-            var server = NamedPipeConnectionFactory.CreateServer("testpipe");
-            var client = NamedPipeConnectionFactory.CreateClient("testpipe");
+            using var server = NamedPipeConnectionFactory.CreateServer("NamedPipeConnectionPointPointShouldSendAndReceiveMessages");
+            using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionPointPointShouldSendAndReceiveMessages");
 
             using var serverReceivedMessageEvent = new AutoResetEvent(false);
             using var clientReceivedMessageEvent = new AutoResetEvent(false);
@@ -500,10 +500,10 @@ namespace TransactTcp.Tests
         [TestMethod]
         public async Task NamedPipeConnectionListenerShouldAcceptNewConnection()
         {
-            using var multiPeerServer = NamedPipeConnectionFactory.CreateMultiPeerServer("testpipe");
+            using var multiPeerServer = NamedPipeConnectionFactory.CreateMultiPeerServer("NamedPipeConnectionListenerShouldAcceptNewConnection");
 
-            using var client1 = NamedPipeConnectionFactory.CreateClient("testpipe");
-            using var client2 = NamedPipeConnectionFactory.CreateClient("testpipe");
+            using var client1 = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionListenerShouldAcceptNewConnection");
+            using var client2 = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionListenerShouldAcceptNewConnection");
 
             using var serverConnectedEvent = new AutoResetEvent(false);
             using var client1ConnectedEvent = new AutoResetEvent(false);

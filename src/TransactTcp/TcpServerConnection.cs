@@ -53,7 +53,6 @@ namespace TransactTcp
                 {
                     System.Diagnostics.Debug.WriteLine(ex);
                 }
-
                 finally
                 {
                     tcpListener.Stop();

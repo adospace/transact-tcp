@@ -119,28 +119,40 @@ namespace TransactTcp
         {
             try
             {
-                using (_sendKeepAliveResetEvent = new AutoResetEvent(false))
-                using (_sendKeepAliveLoopCancellationTokenSource = new CancellationTokenSource()) 
+                if (_sendKeepAliveResetEvent != null)
                 {
-                    _sendKeepAliveTaskIsRunningEvent.Set();
+                    _sendKeepAliveResetEvent.Dispose();
+                    _sendKeepAliveResetEvent = null;
+                }
 
-                    if (_connectedStream.CanTimeout)
-                        _connectedStream.ReadTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+                _sendKeepAliveResetEvent = new AutoResetEvent(false);
 
-                    while (true)
+                if (_sendKeepAliveLoopCancellationTokenSource != null)
+                {
+                    _sendKeepAliveLoopCancellationTokenSource.Dispose();
+                    _sendKeepAliveLoopCancellationTokenSource = null;
+                }
+
+                _sendKeepAliveLoopCancellationTokenSource = new CancellationTokenSource();
+
+                _sendKeepAliveTaskIsRunningEvent.Set();
+
+                if (_connectedStream.CanTimeout)
+                    _connectedStream.ReadTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
+
+                while (true)
+                {
+                    if (!_sendKeepAliveResetEvent.WaitOne(_connectionSettings.KeepAliveMilliseconds))
                     {
-                        if (!_sendKeepAliveResetEvent.WaitOne(_connectionSettings.KeepAliveMilliseconds))
-                        {
-                            _sendKeepAliveLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                        _sendKeepAliveLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-                            ServiceRef.Call(this, async () =>
+                        ServiceRef.Call(this, async () =>
+                        {
+                            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
                             {
-                                if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
-                                {
-                                    await _connectedStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
-                                }
-                            });
-                        }
+                                await _connectedStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
+                            }
+                        });
                     }
                 }
             }
@@ -155,8 +167,8 @@ namespace TransactTcp
             catch (Exception)
             {
 #endif
-                _sendKeepAliveLoopCancellationTokenSource = null;
-                _sendKeepAliveResetEvent = null;
+                //_sendKeepAliveLoopCancellationTokenSource = null;
+                //_sendKeepAliveResetEvent = null;
                 
                 ServiceRef.Call(this, () =>
                 {
@@ -166,8 +178,8 @@ namespace TransactTcp
             }
             finally
             {
-                _sendKeepAliveLoopCancellationTokenSource = null;
-                _sendKeepAliveResetEvent = null;
+                //_sendKeepAliveLoopCancellationTokenSource = null;
+                //_sendKeepAliveResetEvent = null;
             }
         }
 
@@ -180,54 +192,58 @@ namespace TransactTcp
 #pragma warning restore IDE0068 // Use recommended dispose pattern
             try
             {
-                using (_receiveLoopCancellationTokenSource = new CancellationTokenSource())
+                if (_receiveLoopCancellationTokenSource != null)
                 {
-                    _receiveLoopTaskIsRunningEvent.Set();
+                    _receiveLoopCancellationTokenSource.Dispose();
+                    _receiveLoopCancellationTokenSource = null;
+                }
 
-                    var cancellationToken = _receiveLoopCancellationTokenSource.Token;
-                    while (true)
+                _receiveLoopCancellationTokenSource = new CancellationTokenSource();
+                _receiveLoopTaskIsRunningEvent.Set();
+
+                var cancellationToken = _receiveLoopCancellationTokenSource.Token;
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    await _connectedStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
+
+                    var messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
+                    if (messageLength == 0)
+                        continue;
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (messageLength == -1)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        await _connectedStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
-
-                        var messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
-                        if (messageLength == 0)
-                            continue;
-
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        if (messageLength == -1)
+                        if (_receivedActionStreamAsync != null)
                         {
-                            if (_receivedActionStreamAsync != null)
-                            {
-                                var bufferedStream = new NetworkReadStream(_connectedStream);
-                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
-                            }
-                            else
-                            {
-                                throw new InvalidOperationException("ReceiveActionStreamAsync must be specified to handle variable length messages");
-                            }
+                            var bufferedStream = new NetworkReadStream(_connectedStream);
+                            await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
                         }
                         else
                         {
-                            if (_receivedActionStreamAsync != null)
-                            {
-                                var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
-                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
-                                await bufferedStream.FlushAsync();
-                            }
-                            else
-                            {
-                                var messageBuffer = new byte[messageLength];
+                            throw new InvalidOperationException("ReceiveActionStreamAsync must be specified to handle variable length messages");
+                        }
+                    }
+                    else
+                    {
+                        if (_receivedActionStreamAsync != null)
+                        {
+                            var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
+                            await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
+                            await bufferedStream.FlushAsync();
+                        }
+                        else
+                        {
+                            var messageBuffer = new byte[messageLength];
 
-                                await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
+                            await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
 
-                                if (_receivedActionAsync != null)
-                                    await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
-                                else //if (_receivedAction != null)
-                                    _receivedAction(refToThis, messageBuffer);
-                            }
+                            if (_receivedActionAsync != null)
+                                await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
+                            else //if (_receivedAction != null)
+                                _receivedAction(refToThis, messageBuffer);
                         }
                     }
                 }
@@ -243,7 +259,7 @@ namespace TransactTcp
             catch (Exception)
             {
 #endif                
-                _receiveLoopCancellationTokenSource = null;
+                //_receiveLoopCancellationTokenSource = null;
 
                 ServiceRef.Call(this, () =>
                 {
@@ -253,7 +269,7 @@ namespace TransactTcp
             }
             finally
             {
-                _receiveLoopCancellationTokenSource = null;
+                //_receiveLoopCancellationTokenSource = null;
             }
         }
 
@@ -265,8 +281,8 @@ namespace TransactTcp
                     _receiveLoopTask.Wait();
                 else
                     Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
-                System.Diagnostics.Debug.Assert(_receiveLoopCancellationTokenSource == null);
-                System.Diagnostics.Debug.Assert(_sendKeepAliveLoopCancellationTokenSource == null);
+                //System.Diagnostics.Debug.Assert(_receiveLoopCancellationTokenSource == null);
+                //System.Diagnostics.Debug.Assert(_sendKeepAliveLoopCancellationTokenSource == null);
                 _receiveLoopTask.Dispose();
                 _sendKeepAliveLoopTask?.Dispose();
                 _receiveLoopTask = null;
@@ -283,14 +299,17 @@ namespace TransactTcp
         {
             try
             {
-                using (_connectCancellationTokenSource = new CancellationTokenSource())
+                if (_connectCancellationTokenSource != null)
                 {
-                    await OnConnectAsync(_connectCancellationTokenSource.Token);
-
-                    _connectCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                    _connectCancellationTokenSource.Dispose();
+                    _connectCancellationTokenSource = null;
                 }
+            
+                _connectCancellationTokenSource = new CancellationTokenSource();
+                
+                await OnConnectAsync(_connectCancellationTokenSource.Token);
 
-                _connectCancellationTokenSource = null;
+                _connectCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
                 ServiceRef.Call(this, () =>
                 {
@@ -312,8 +331,6 @@ namespace TransactTcp
             catch (Exception)
             {
 #endif                
-                _connectCancellationTokenSource = null;
-
                 ServiceRef.Call(this, () =>
                 {
                     if (_connectionStateMachine.State == ConnectionState.Connecting)
@@ -322,7 +339,6 @@ namespace TransactTcp
             }
             finally
             {
-                _connectCancellationTokenSource = null;
             }
         }
 
@@ -448,9 +464,13 @@ namespace TransactTcp
                 {
                     Stop();
                     _connectCancellationTokenSource?.Dispose();
+                    _connectCancellationTokenSource = null;
                     _sendKeepAliveLoopCancellationTokenSource?.Dispose();
+                    _sendKeepAliveLoopCancellationTokenSource = null;
                     _receiveLoopCancellationTokenSource?.Dispose();
+                    _receiveLoopCancellationTokenSource = null;
                     _sendKeepAliveResetEvent?.Dispose();
+                    _sendKeepAliveResetEvent = null;
                 }
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.

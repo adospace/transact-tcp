@@ -181,9 +181,9 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = NamedPipeConnectionFactory.CreateServer("testpipe");
+            using var server = NamedPipeConnectionFactory.CreateServer("NamedPipeServerAndClientShouldConnectAndDisconnectWithoutErrors");
 
-            var client = NamedPipeConnectionFactory.CreateClient("testpipe");
+            using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeServerAndClientShouldConnectAndDisconnectWithoutErrors");
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -240,7 +240,7 @@ namespace TransactTcp.Tests
         [TestMethod]
         public void NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist()
         {
-            var client = NamedPipeConnectionFactory.CreateClient("testpipe");
+            using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist");
             using var connectionLinkErrorEvent = new AutoResetEvent(false);
             using var connectionOkEvent = new AutoResetEvent(false);
 
@@ -254,7 +254,7 @@ namespace TransactTcp.Tests
 
             connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
 
-            var server = NamedPipeConnectionFactory.CreateServer("testpipe");
+            using var server = NamedPipeConnectionFactory.CreateServer("NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist");
 
             server.Start();
 
