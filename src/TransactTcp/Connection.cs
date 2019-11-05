@@ -307,7 +307,7 @@ namespace TransactTcp
             
                 _connectCancellationTokenSource = new CancellationTokenSource();
                 
-                await OnConnectAsync(_connectCancellationTokenSource.Token);
+                await OnConnectAsync(_connectCancellationTokenSource);
 
                 _connectCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
@@ -342,9 +342,10 @@ namespace TransactTcp
             }
         }
 
-        protected abstract Task OnConnectAsync(CancellationToken cancellationToken);
+        protected abstract Task OnConnectAsync(CancellationTokenSource cancellationTokenSource);
 
         public ConnectionState State { get => _connectionStateMachine.State; }
+
         public async Task SendDataAsync(byte[] data, CancellationToken cancellationToken)
         {
             if (data == null)

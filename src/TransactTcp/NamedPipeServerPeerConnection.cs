@@ -25,7 +25,7 @@ namespace TransactTcp
 
         protected override bool IsStreamConnected => (_pipeConnectedWithClient?.IsConnected).GetValueOrDefault();
 
-        protected override Task OnConnectAsync(CancellationToken cancellationToken)
+        protected override Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
         {
             _connectedStream = _pipeConnectedWithClient;
             return Task.CompletedTask;

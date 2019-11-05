@@ -22,8 +22,10 @@ namespace TransactTcp
 
         protected override bool IsStreamConnected => (_pipeServer?.IsConnected).GetValueOrDefault();
 
-        protected override async Task OnConnectAsync(CancellationToken cancellationToken)
+        protected override async Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
         {
+            var cancellationToken = cancellationTokenSource.Token;
+
             _pipeServer =
                 new NamedPipeServerStream(_localEndPointName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 

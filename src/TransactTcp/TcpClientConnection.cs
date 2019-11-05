@@ -27,8 +27,10 @@ namespace TransactTcp
 
         protected override bool IsStreamConnected => (_tcpClient?.Connected).GetValueOrDefault();
 
-        protected override async Task OnConnectAsync(CancellationToken cancellationToken)
+        protected override async Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
         {
+            var cancellationToken = cancellationTokenSource.Token;
+
             _tcpClient = _localEndPoint == null ? new TcpClient() : new TcpClient(_localEndPoint);
             var cancellationCompletionSource = new TaskCompletionSource<bool>();
 
