@@ -102,8 +102,8 @@ namespace TransactTcp
 
         public void Stop()
         {
-            _listeningTask?.Wait();
             _listeningLoopCancellationTokenSource?.Cancel();
+            _listeningTask?.Wait();
             _listeningLoopCancellationTokenSource = null;
             _listeningTask = null;
         }

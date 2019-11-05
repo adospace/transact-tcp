@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
+using ServiceActor;
 
 namespace TransactTcp
 {
@@ -10,6 +11,7 @@ namespace TransactTcp
         void Start(
             Action<IConnectionListener, IConnection> connectionCreated);
 
+        [BlockCaller]
         void Stop();
 
         bool Listening { get; }

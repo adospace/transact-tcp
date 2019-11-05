@@ -401,6 +401,8 @@ namespace TransactTcp.Tests
             await client.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING")));
 
             WaitHandle.WaitAll(new[] { receivedBackFromServerEvent }, 100000).ShouldBeTrue();
+
+            multiPeerServer.Stop();
         }
 
         [TestMethod]
@@ -494,7 +496,7 @@ namespace TransactTcp.Tests
             server.State.ShouldBe(ConnectionState.Disconnected);
             client.State.ShouldBe(ConnectionState.Disconnected);
 
-
+            
         }
 
         [TestMethod]
@@ -523,8 +525,10 @@ namespace TransactTcp.Tests
                         await connection.SendDataAsync(
                             new Memory<byte>(Encoding.UTF8.GetBytes($"SERVER RECEIVED: {pingString}")));
                     },
-                    connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) serverConnectedEvent.Set(); }
-                    );
+                    connectionStateChangedAction: (c, fromState, toState) =>
+                    {
+                        if (toState == ConnectionState.Connected) serverConnectedEvent.Set();
+                    });
             });
 
             client1.Start(
@@ -558,6 +562,8 @@ namespace TransactTcp.Tests
             await client2.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT2")));
 
             WaitHandle.WaitAll(new[] { receivedClient1BackFromServerEvent, receivedClient2BackFromServerEvent }, 100000).ShouldBeTrue();
+
+            multiPeerServer.Stop();
         }
     }
 }
