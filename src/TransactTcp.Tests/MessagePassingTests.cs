@@ -495,8 +495,6 @@ namespace TransactTcp.Tests
 
             server.State.ShouldBe(ConnectionState.Disconnected);
             client.State.ShouldBe(ConnectionState.Disconnected);
-
-            
         }
 
         [TestMethod]

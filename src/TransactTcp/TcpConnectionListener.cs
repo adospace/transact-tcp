@@ -42,8 +42,8 @@ namespace TransactTcp
             var tcpListener = new TcpListener(_localEndPoint);
             try
             {
-
                 tcpListener.Start(_settings.BackLog);
+
                 _listeningLoopCancellationTokenSource = new CancellationTokenSource();
                 {
                     while (true)

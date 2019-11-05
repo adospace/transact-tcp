@@ -213,5 +213,52 @@ namespace TransactTcp.Tests
             client.State.ShouldBe(ConnectionState.Disconnected);
         }
 
+        [TestMethod]
+        public void ClientShouldMoveStateToLinkErrorIfServerDoesntExist()
+        {
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var connectionLinkErrorEvent = new AutoResetEvent(false);
+            using var connectionOkEvent = new AutoResetEvent(false);
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.LinkError)
+                    connectionLinkErrorEvent.Set();
+                else if (toState == ConnectionState.Connected)
+                    connectionOkEvent.Set();
+            });
+
+            connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
+
+            var server = TcpConnectionFactory.CreateServer(15000);
+
+            server.Start();
+
+            connectionOkEvent.WaitOne(10000).ShouldBeTrue();
+        }
+
+        [TestMethod]
+        public void NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist()
+        {
+            var client = NamedPipeConnectionFactory.CreateClient("testpipe");
+            using var connectionLinkErrorEvent = new AutoResetEvent(false);
+            using var connectionOkEvent = new AutoResetEvent(false);
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.LinkError)
+                    connectionLinkErrorEvent.Set();
+                else if (toState == ConnectionState.Connected)
+                    connectionOkEvent.Set();
+            });
+
+            connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
+
+            var server = NamedPipeConnectionFactory.CreateServer("testpipe");
+
+            server.Start();
+
+            connectionOkEvent.WaitOne(10000).ShouldBeTrue();
+        }
     }
 }

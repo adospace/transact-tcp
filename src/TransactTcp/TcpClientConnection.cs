@@ -59,6 +59,11 @@ namespace TransactTcp
                         break;
                     }
 
+                    if (_connectionStateMachine.State == ConnectionState.Connecting)
+                    {
+                        throw new SocketException();
+                    }
+
                     if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelayMilliseconds))
                         break;
                 }

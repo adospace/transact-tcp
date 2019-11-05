@@ -38,7 +38,14 @@ namespace TransactTcp
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            await _pipeClient.ConnectAsync(cancellationToken);
+            if (_connectionStateMachine.State == ConnectionState.Connecting)
+            {
+                await _pipeClient.ConnectAsync(_connectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
+            }
+            else
+            {
+                await _pipeClient.ConnectAsync(cancellationToken);
+            }
 
             _connectedStream = _pipeClient;
         }
