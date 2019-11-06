@@ -40,6 +40,15 @@ namespace TransactTcp
         public static IConnection CreateClient(IPAddress remoteIp, int remotePort, ClientConnectionSettings connectionSettings = null)
             => CreateClient(new IPEndPoint(remoteIp, remotePort), connectionSettings);
 
+        public static IConnection CreateClient(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, ClientConnectionSettings connectionSettings = null)
+            => CreateClient(new TcpConnectionEndPoint(localEndPoint: localEndPoint, remoteEndPoint: remoteEndPoint, connectionSettings: connectionSettings));
+
+        public static IConnection CreateClient(IPAddress localIp, int localPort, IPAddress remoteIp, int remotePort, ClientConnectionSettings connectionSettings = null)
+            => CreateClient(new TcpConnectionEndPoint(localEndPoint: new IPEndPoint(localIp, localPort), remoteEndPoint: new IPEndPoint(remoteIp, remotePort), connectionSettings: connectionSettings));
+
+        public static IConnection CreateClient(string localIp, int localPort, string remoteIp, int remotePort, ClientConnectionSettings connectionSettings = null)
+            => CreateClient(new TcpConnectionEndPoint(localEndPoint: new IPEndPoint(IPAddress.Parse(localIp), localPort), remoteEndPoint: new IPEndPoint(IPAddress.Parse(remoteIp), remotePort), connectionSettings));
+
 
         private static IConnection CreateSslServer(TcpConnectionEndPoint endPoint)
             => ServiceRef.Create<IConnection>(new SslTcpServerConnection(endPoint));
