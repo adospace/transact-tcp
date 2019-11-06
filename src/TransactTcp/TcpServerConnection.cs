@@ -14,19 +14,20 @@ namespace TransactTcp
     {
         protected TcpClient _tcpToClient;
         private readonly IPEndPoint _localEndPoint;
+        private readonly ServerConnectionSettings _serverConnectionSettings;
 
         public TcpServerConnection(
            TcpConnectionEndPoint connectionEndPoint) 
-            : base(connectionEndPoint?.ConnectionSettings)
+            : base(connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings())
         {
+            _serverConnectionSettings = (ServerConnectionSettings) _connectionSettings;
             _localEndPoint = connectionEndPoint.LocalEndPoint ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPoint");
         }
 
         protected override bool IsStreamConnected => (_tcpToClient?.Connected).GetValueOrDefault();
 
-        protected override async Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
+        protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            var cancellationToken = cancellationTokenSource.Token;
             var tcpListener = new TcpListener(_localEndPoint);
 
             tcpListener.Start(1);
@@ -35,7 +36,7 @@ namespace TransactTcp
             {
                 try
                 {
-                    _tcpToClient = await tcpListener.AcceptTcpClientAsync();
+                    await AcceptConnectionAsync(tcpListener, cancellationToken);
                 }
                 catch (InvalidOperationException)
                 {
@@ -50,9 +51,14 @@ namespace TransactTcp
                     cancellationToken.ThrowIfCancellationRequested();
                     throw;
                 }
+#if DEBUG
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine(ex);
+#else
+                catch (Exception)
+                {
+#endif
                 }
                 finally
                 {
@@ -61,6 +67,24 @@ namespace TransactTcp
             }
 
             _connectedStream = await CreateConnectedStreamAsync(_tcpToClient, cancellationToken);
+        }
+
+        private async Task AcceptConnectionAsync(TcpListener tcpListener, CancellationToken cancellationToken)
+        {
+            if (State == ConnectionState.Connecting)
+            {
+                //when connecting accept connection with a timeout
+                using var timeoutCancellationTokenSource =
+                    new CancellationTokenSource(_serverConnectionSettings.ConnectionTimeoutMilliseconds);
+
+                timeoutCancellationTokenSource.Token.Register(() => tcpListener.Stop());
+
+                _tcpToClient = await tcpListener.AcceptTcpClientAsync();
+            }
+            else // if (State == ConnectionState.LinkError)
+            {
+                _tcpToClient = await tcpListener.AcceptTcpClientAsync();
+            }
         }
 
         protected virtual Task<Stream> CreateConnectedStreamAsync(TcpClient tcpClient, CancellationToken cancellationToken)
@@ -74,6 +98,9 @@ namespace TransactTcp
 
             _tcpToClient?.Close();
             _tcpToClient = null;
+
+            if (State == ConnectionState.LinkError)
+                BeginConnection();
         }
 
     }

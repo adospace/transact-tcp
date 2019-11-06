@@ -17,15 +17,14 @@ namespace TransactTcp
         public NamedPipeServerPeerConnection(
             NamedPipeServerStream pipeConnectedWithClient, 
             ConnectionSettings connectionSettings = null) 
-            : base(connectionSettings ?? new ConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
+            : base(connectionSettings ?? new ServerConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
             _pipeConnectedWithClient = pipeConnectedWithClient;
-            _connectionSettings.AutoReconnect = false;
         }
 
         protected override bool IsStreamConnected => (_pipeConnectedWithClient?.IsConnected).GetValueOrDefault();
 
-        protected override Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
+        protected override Task OnConnectAsync(CancellationToken cancellationToken)
         {
             _connectedStream = _pipeConnectedWithClient;
             return Task.CompletedTask;

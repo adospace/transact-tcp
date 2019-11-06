@@ -14,15 +14,15 @@ namespace TransactTcp.Ssl
 {
     internal class SslTcpClientConnection : TcpClientConnection
     {
-        private readonly SslConnectionSettings _sslConnectionSettings;
+        private readonly SslClientConnectionSettings _sslConnectionSettings;
         private readonly Action<IConnection, AuthenticationException> _onAuthenticationException;
 
         public SslTcpClientConnection(
-            SslTcpConnectionEndPoint connectionEndPoint,
+            TcpConnectionEndPoint connectionEndPoint,
             Action<IConnection, AuthenticationException> onAuthenticationException = null)
             : base(connectionEndPoint)
         {
-            _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? new SslConnectionSettings();
+            _sslConnectionSettings = ((SslClientConnectionSettings)connectionEndPoint.ConnectionSettings) ?? new SslClientConnectionSettings();
             _onAuthenticationException = onAuthenticationException;
         }
 

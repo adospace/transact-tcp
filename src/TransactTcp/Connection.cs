@@ -68,7 +68,7 @@ namespace TransactTcp
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
                 .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
                 .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
-                .OnEntry(() => Task.Run(OnConnectAsyncCore))
+                .OnEntry(() => BeginConnection())
                 .OnExit(() => _connectCancellationTokenSource?.Cancel());
 
             _connectionStateMachine.Configure(ConnectionState.Connected)
@@ -107,11 +107,10 @@ namespace TransactTcp
             _connectionStateMachine.Configure(ConnectionState.LinkError)
                 .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
+                .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
                 .OnEntryFrom(ConnectionTrigger.LinkError, () =>
                 {
                     OnDisconnect();
-                    if (_connectionSettings.AutoReconnect)
-                        Task.Run(OnConnectAsyncCore);
                 });
         }
 
@@ -295,6 +294,9 @@ namespace TransactTcp
 
         protected abstract bool IsStreamConnected { get; }
 
+        protected void BeginConnection()
+            => Task.Run(OnConnectAsyncCore);
+
         private async Task OnConnectAsyncCore()
         {
             try
@@ -307,7 +309,7 @@ namespace TransactTcp
             
                 _connectCancellationTokenSource = new CancellationTokenSource();
                 
-                await OnConnectAsync(_connectCancellationTokenSource);
+                await OnConnectAsync(_connectCancellationTokenSource.Token);
 
                 _connectCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
@@ -342,7 +344,7 @@ namespace TransactTcp
             }
         }
 
-        protected abstract Task OnConnectAsync(CancellationTokenSource cancellationTokenSource);
+        protected abstract Task OnConnectAsync(CancellationToken cancellationToken);
 
         public ConnectionState State { get => _connectionStateMachine.State; }
 

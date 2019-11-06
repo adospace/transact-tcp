@@ -12,22 +12,22 @@ namespace TransactTcp.Ssl
 {
     internal class SslTcpServerConnection : TcpServerConnection
     {
-        private readonly SslConnectionSettings _sslConnectionSettings;
+        private readonly SslServerConnectionSettings _sslConnectionSettings;
         private readonly Action<IConnection, AuthenticationException> _onAuthenticationException;
 
         public SslTcpServerConnection(
-            SslTcpConnectionEndPoint connectionEndPoint,
+            TcpConnectionEndPoint connectionEndPoint,
             Action<IConnection, AuthenticationException> onAuthenticationException = null)
             : base(connectionEndPoint)
         {
-            _sslConnectionSettings = connectionEndPoint.SslConnectionSettings ?? new SslConnectionSettings();
+            _sslConnectionSettings = ((SslServerConnectionSettings)connectionEndPoint.ConnectionSettings) ?? new SslServerConnectionSettings();
             _onAuthenticationException = onAuthenticationException;
         }
 
         protected override async Task<Stream> CreateConnectedStreamAsync(TcpClient tcpClient, CancellationToken cancellationToken)
         {
             var sslStream = new SslStream(
-                _tcpToClient.GetStream(),
+                tcpClient.GetStream(),
                 true,
                 _sslConnectionSettings.SslValidateCertificateCallback == null ? null : new RemoteCertificateValidationCallback(_sslConnectionSettings.SslValidateCertificateCallback),
                 null);

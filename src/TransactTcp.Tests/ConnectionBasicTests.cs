@@ -260,5 +260,53 @@ namespace TransactTcp.Tests
 
             connectionOkEvent.WaitOne(10000).ShouldBeTrue();
         }
+
+        [TestMethod]
+        public void ServerShouldMoveStateToLinkErrorIfClientDoesntConnect()
+        {
+            var server = TcpConnectionFactory.CreateServer(15000, new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
+            using var connectionLinkErrorEvent = new AutoResetEvent(false);
+            using var connectionOkEvent = new AutoResetEvent(false);
+
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.LinkError)
+                    connectionLinkErrorEvent.Set();
+                else if (toState == ConnectionState.Connected)
+                    connectionOkEvent.Set();
+            });
+
+            connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
+
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+
+            client.Start();
+
+            connectionOkEvent.WaitOne(10000).ShouldBeTrue();
+        }
+
+        [TestMethod]
+        public void NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect()
+        {
+            var server = NamedPipeConnectionFactory.CreateServer("NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect", new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
+            using var connectionLinkErrorEvent = new AutoResetEvent(false);
+            using var connectionOkEvent = new AutoResetEvent(false);
+
+            server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.LinkError)
+                    connectionLinkErrorEvent.Set();
+                else if (toState == ConnectionState.Connected)
+                    connectionOkEvent.Set();
+            });
+
+            connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
+
+            var client = NamedPipeConnectionFactory.CreateClient("NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect");
+
+            client.Start();
+
+            connectionOkEvent.WaitOne(10000).ShouldBeTrue();
+        }
     }
 }

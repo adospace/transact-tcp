@@ -7,11 +7,12 @@ using System.Text;
 
 namespace TransactTcp.Ssl
 {
-    public class SslConnectionSettings : ConnectionSettings
+    public class SslClientConnectionSettings : ClientConnectionSettings
     {
-        public SslConnectionSettings(
+        public SslClientConnectionSettings(
             int keepAliveMilliseconds = 500,
             int reconnectionDelayMilliseconds = 1000,
+            bool autoReconnect = true,
             X509Certificate sslCertificate = null,
             bool sslClientCertificateRequired = false,
             SslProtocols sslEnabledProtocols = SslProtocols.Tls12,
@@ -24,16 +25,11 @@ namespace TransactTcp.Ssl
             bool> sslValidateServerCertificateCallback = null,
             string sslServerHost = null
             )
-            : base(keepAliveMilliseconds, reconnectionDelayMilliseconds)
+            : base(keepAliveMilliseconds, reconnectionDelayMilliseconds, autoReconnect)
         {
             if (keepAliveMilliseconds <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(keepAliveMilliseconds));
-            }
-
-            if (reconnectionDelayMilliseconds <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(reconnectionDelayMilliseconds));
             }
 
             SslCertificate = sslCertificate;

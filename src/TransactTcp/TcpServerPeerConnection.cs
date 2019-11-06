@@ -17,14 +17,12 @@ namespace TransactTcp
             : base(connectionSettings)
         {
             _tcpToClient = tcpToClient;
-            _connectionSettings.AutoReconnect = false;
         }
 
         protected override bool IsStreamConnected => (_tcpToClient?.Connected).GetValueOrDefault();
 
-        protected override async Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
+        protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            var cancellationToken = cancellationTokenSource.Token;
             _tcpToClient.ReceiveTimeout = _connectionSettings.KeepAliveMilliseconds * 2;
             _connectedStream = await CreateConnectedStreamAsync(_tcpToClient, cancellationToken);
         }

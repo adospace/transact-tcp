@@ -15,22 +15,22 @@ namespace TransactTcp
     {
         private readonly IPEndPoint _remoteEndPoint;
         private readonly IPEndPoint _localEndPoint;
+        private readonly ClientConnectionSettings _clientConnectionSettings;
         private TcpClient _tcpClient;
 
         public TcpClientConnection(
             TcpConnectionEndPoint connectionEndPoint)
-            : base(connectionEndPoint?.ConnectionSettings)
+            : base(connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings())
         {
+            _clientConnectionSettings = (ClientConnectionSettings) _connectionSettings;
             _remoteEndPoint = connectionEndPoint.RemoteEndPoint ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPoint));
             _localEndPoint = connectionEndPoint.LocalEndPoint;
         }
 
         protected override bool IsStreamConnected => (_tcpClient?.Connected).GetValueOrDefault();
 
-        protected override async Task OnConnectAsync(CancellationTokenSource cancellationTokenSource)
+        protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            var cancellationToken = cancellationTokenSource.Token;
-
             _tcpClient = _localEndPoint == null ? new TcpClient() : new TcpClient(_localEndPoint);
             var cancellationCompletionSource = new TaskCompletionSource<bool>();
 
@@ -66,7 +66,7 @@ namespace TransactTcp
                         throw new SocketException();
                     }
 
-                    if (reconnectionDelayEvent.WaitOne(_connectionSettings.ReconnectionDelayMilliseconds))
+                    if (reconnectionDelayEvent.WaitOne(_clientConnectionSettings.ReconnectionDelayMilliseconds))
                         break;
                 }
                 catch (OperationCanceledException)
@@ -87,6 +87,9 @@ namespace TransactTcp
 
             _tcpClient?.Close();
             _tcpClient = null;
+
+            if (State == ConnectionState.LinkError && _clientConnectionSettings.AutoReconnect)
+                BeginConnection();
         }
     }
 }
