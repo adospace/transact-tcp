@@ -108,6 +108,49 @@ namespace TransactTcp.Tests
         }
 
         [TestMethod]
+        public async Task MessageReceivedWithStreamAndUsingBufferStreamShouldWork()
+        {
+            using var serverStateChangedEvent = new AutoResetEvent(false);
+            using var clientStateChangedEvent = new AutoResetEvent(false);
+
+            using var serverReceivedDataEvent = new AutoResetEvent(false);
+
+            int currentMessageSize = -1;
+
+            using var server = TcpConnectionFactory.CreateServer(15001, new ServerConnectionSettings(useBufferedStream: true));
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15001, new ClientConnectionSettings(useBufferedStream: true));
+
+            client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    clientStateChangedEvent.Set();
+            });
+
+            server.Start(receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+            {
+                var bytesRead = await stream.ReadAsync(new byte[stream.Length], 0, (int)stream.Length, cancellationToken);
+                Assert.AreEqual(currentMessageSize, bytesRead);
+                serverReceivedDataEvent.Set();
+            },
+            connectionStateChangedAction: (connection, fromState, toState) =>
+            {
+                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
+                    serverStateChangedEvent.Set();
+            });
+
+            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+
+            await client.SendDataAsync(new byte[currentMessageSize = 10]);
+
+            serverReceivedDataEvent.WaitOne(10000).ShouldBeTrue();
+
+            await client.SendDataAsync(new byte[currentMessageSize = 120]);
+
+            serverReceivedDataEvent.WaitOne(10000).ShouldBeTrue();
+        }
+
+        [TestMethod]
         public async Task MessagesShouldPassThruRedundantChannelWhenNotAllChildConnectionsAreSlowOrDown()
         {
             var toxiproxyServerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TransactTcp.Tests", "toxiproxy-server-windows-amd64.exe");
@@ -119,7 +162,7 @@ namespace TransactTcp.Tests
 
             foreach (var existentToxiserverProcess in Process.GetProcessesByName("toxiproxy-server-windows-amd64.exe").ToList())
                 existentToxiserverProcess.Kill();
-             
+
 
             using var toxyproxyServerProcess = Process.Start(toxiproxyServerPath);
 
@@ -159,13 +202,13 @@ namespace TransactTcp.Tests
 
                 int counterOfMessagesArrivedAtServer = 0;
                 serverConnection.Start(
-                    receivedAction: (c, data) => 
+                    receivedAction: (c, data) =>
                     {
                         if (BitConverter.ToInt32(data) != counterOfMessagesArrivedAtServer)
                             errorsOnServerSideEvent.Set();
                         counterOfMessagesArrivedAtServer++;
                     },
-                    connectionStateChangedAction: (c, fromState, toState) => 
+                    connectionStateChangedAction: (c, fromState, toState) =>
                     {
                         if (toState == ConnectionState.Connected)
                             serverConnectedEvent.Set();
@@ -173,13 +216,13 @@ namespace TransactTcp.Tests
 
                 int counterOfMessagesArrivedAtClient = 0;
                 clientConnection.Start(
-                    receivedAction: (c, data) => 
+                    receivedAction: (c, data) =>
                     {
                         if (BitConverter.ToInt32(data) != counterOfMessagesArrivedAtClient)
                             errorsOnClientSideEvent.Set();
                         counterOfMessagesArrivedAtClient++;
                     },
-                    connectionStateChangedAction: (c, fromState, toState) => 
+                    connectionStateChangedAction: (c, fromState, toState) =>
                     {
                         if (toState == ConnectionState.Connected)
                             clientConnectedEvent.Set();
@@ -444,7 +487,7 @@ namespace TransactTcp.Tests
                     else if (toState == ConnectionState.Disconnected)
                         serverDisconnectedEvent.Set();
                 },
-                receivedActionStreamAsync: async (connection, stream, cancellationToken) => 
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
                 {
                     Debug.WriteLine($"Server received message");
                     using var sr = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
@@ -483,6 +526,102 @@ namespace TransactTcp.Tests
 
             await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER\n"));
             await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT\n"));
+
+            serverReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+            clientReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.Stop();
+            client.Stop();
+
+            serverDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
+            clientDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Disconnected);
+            client.State.ShouldBe(ConnectionState.Disconnected);
+        }
+
+        [TestMethod]
+        public async Task NamedPipeConnectionPointPointShouldSendAndReceiveMessagesUsingBufferedStream()
+        {
+            using var serverConnectedEvent = new AutoResetEvent(false);
+            using var clientConnectedEvent = new AutoResetEvent(false);
+            using var serverDisconnectedEvent = new AutoResetEvent(false);
+            using var clientDisconnectedEvent = new AutoResetEvent(false);
+
+            using var server = NamedPipeConnectionFactory.CreateServer("NamedPipeConnectionPointPointShouldSendAndReceiveMessagesUsingBufferedStream", new ServerConnectionSettings(useBufferedStream: true));
+            using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionPointPointShouldSendAndReceiveMessagesUsingBufferedStream", new ClientConnectionSettings(useBufferedStream: true));
+
+            using var serverReceivedMessageEvent = new AutoResetEvent(false);
+            using var clientReceivedMessageEvent = new AutoResetEvent(false);
+
+            client.Start(
+                connectionStateChangedAction: (connection, fromState, toState) =>
+                {
+                    Debug.WriteLine($"Client state changed to {toState}");
+                    if (toState == ConnectionState.Connected)
+                        clientConnectedEvent.Set();
+                    else if (toState == ConnectionState.Disconnected)
+                        clientDisconnectedEvent.Set();
+                },
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    //NOTE: Do not use reader like StreamReader that already use a internal buffer!
+                    Debug.WriteLine($"Client received message");
+                    var buffer = new byte[19];
+                    await stream.ReadAsync(buffer, 0, buffer.Length);
+                    if (Encoding.UTF8.GetString(buffer) == "MESSAGE FROM SERVER")
+                        clientReceivedMessageEvent.Set();
+                });
+
+            //start server after client just to prove that it works
+            server.Start(
+                connectionStateChangedAction: (connection, fromState, toState) =>
+                {
+                    Debug.WriteLine($"Server state changed to {toState}");
+                    if (toState == ConnectionState.Connected)
+                        serverConnectedEvent.Set();
+                    else if (toState == ConnectionState.Disconnected)
+                        serverDisconnectedEvent.Set();
+                },
+                receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
+                {
+                    //NOTE: Do not use reader like StreamReader that already use a internal buffer!
+                    Debug.WriteLine($"Server received message");
+                    var buffer = new byte[19];
+                    await stream.ReadAsync(buffer, 0, buffer.Length);
+                    if (Encoding.UTF8.GetString(buffer) == "MESSAGE FROM CLIENT")
+                        serverReceivedMessageEvent.Set();
+                });
+
+            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
+            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Connected);
+            client.State.ShouldBe(ConnectionState.Connected);
+
+            await server.SendAsync(async (stream, cancellationToken) =>
+            {
+                await stream.WriteAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER"));
+            });
+            await client.SendAsync(async (stream, cancellationToken) =>
+            {
+                await stream.WriteAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT"));
+            });
+
+            serverReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+            clientReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.Stop();
+            server.Start();
+
+            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
+            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
+
+            server.State.ShouldBe(ConnectionState.Connected);
+            client.State.ShouldBe(ConnectionState.Connected);
+
+            await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER"));
+            await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT"));
 
             serverReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();
             clientReceivedMessageEvent.WaitOne(10000).ShouldBeTrue();

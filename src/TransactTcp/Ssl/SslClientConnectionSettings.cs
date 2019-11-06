@@ -13,6 +13,7 @@ namespace TransactTcp.Ssl
             int keepAliveMilliseconds = 500,
             int reconnectionDelayMilliseconds = 1000,
             bool autoReconnect = true,
+            bool useBufferedStream = false,
             X509Certificate sslCertificate = null,
             bool sslClientCertificateRequired = false,
             SslProtocols sslEnabledProtocols = SslProtocols.Tls12,
@@ -25,7 +26,7 @@ namespace TransactTcp.Ssl
             bool> sslValidateServerCertificateCallback = null,
             string sslServerHost = null
             )
-            : base(keepAliveMilliseconds, reconnectionDelayMilliseconds, autoReconnect)
+            : base(keepAliveMilliseconds, reconnectionDelayMilliseconds, autoReconnect, useBufferedStream)
         {
             if (keepAliveMilliseconds <= 0)
             {

@@ -7,8 +7,9 @@ namespace TransactTcp
     public class ServerConnectionSettings : ConnectionSettings
     {
         public ServerConnectionSettings(int keepAliveMilliseconds = 500,
-            int connectionTimeoutMilliseconds = 10000)
-            : base(keepAliveMilliseconds)
+            int connectionTimeoutMilliseconds = 10000,
+            bool useBufferedStream = false)
+            : base(keepAliveMilliseconds, useBufferedStream)
         {
             if (connectionTimeoutMilliseconds < 0) //->0 to disable keep alive
             {

@@ -58,6 +58,7 @@ namespace TransactTcp
                     if (!connectTask.IsFaulted)
                     {
                         _connectedStream = await CreateConnectedStreamAsync(_tcpClient, cancellationToken);
+
                         break;
                     }
 

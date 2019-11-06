@@ -12,6 +12,7 @@ namespace TransactTcp.Ssl
         public SslServerConnectionSettings(
             int keepAliveMilliseconds = 500,
             int connectionTimeoutMilliseconds = 10000,
+            bool useBufferedStream = false,
             X509Certificate sslCertificate = null,
             bool sslClientCertificateRequired = false,
             SslProtocols sslEnabledProtocols = SslProtocols.Tls12,
@@ -24,7 +25,7 @@ namespace TransactTcp.Ssl
             bool> sslValidateServerCertificateCallback = null,
             string sslServerHost = null
             )
-            : base(keepAliveMilliseconds, connectionTimeoutMilliseconds)
+            : base(keepAliveMilliseconds, connectionTimeoutMilliseconds, useBufferedStream)
         {
             if (keepAliveMilliseconds <= 0)
             {

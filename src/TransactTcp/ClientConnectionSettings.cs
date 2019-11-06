@@ -8,8 +8,9 @@ namespace TransactTcp
     {
         public ClientConnectionSettings(int keepAliveMilliseconds = 500,
             int reconnectionDelayMilliseconds = 1000,
-            bool autoReconnect = true)
-            : base(keepAliveMilliseconds)
+            bool autoReconnect = true,
+            bool useBufferedStream = false)
+            : base(keepAliveMilliseconds, useBufferedStream)
         {
             if (reconnectionDelayMilliseconds < 0)
             {

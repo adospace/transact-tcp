@@ -20,7 +20,8 @@ namespace TransactTcp
         /// <param name="reconnectionDelayMilliseconds">Delay to wait before retry a connection to server</param>
         /// <param name="autoReconnect">Enable/disable automatic re-connection to server</param>
         public ConnectionSettings(
-            int keepAliveMilliseconds = 500
+            int keepAliveMilliseconds = 500,
+            bool useBufferedStream = false
             )
         {
             if (keepAliveMilliseconds < 0) //->0 to disable keep alive
@@ -29,11 +30,17 @@ namespace TransactTcp
             }
 
             KeepAliveMilliseconds = keepAliveMilliseconds;
+            UseBufferedStream = useBufferedStream;
         }
 
         /// <summary>
         /// Time to wait before send a keep alive to other peer
         /// </summary>
         public int KeepAliveMilliseconds { get; }
+
+        /// <summary>
+        /// Indicates if connected strema should be wrapped with a <see cref="System.IO.BufferedStream"/> (False by default)
+        /// </summary>
+        public bool UseBufferedStream { get; }
     }
 }

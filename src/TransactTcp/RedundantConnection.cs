@@ -101,8 +101,9 @@ namespace TransactTcp
 
         private void OnChildChannelConnectionStateChanged(IConnection connection, ConnectionState fromState, ConnectionState toState)
         {
+#if DEBUG
             System.Diagnostics.Debug.WriteLine($"{connection.GetType()} connection state changed from {fromState} to {toState}");
-
+#endif
             if (toState == ConnectionState.Connected)
                 //even if only one connection is connected I'm connected
                 _connectionStateMachine.Fire(ConnectionTrigger.Connected);

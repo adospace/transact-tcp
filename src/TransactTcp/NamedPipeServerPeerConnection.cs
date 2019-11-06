@@ -27,6 +27,7 @@ namespace TransactTcp
         protected override Task OnConnectAsync(CancellationToken cancellationToken)
         {
             _connectedStream = _pipeConnectedWithClient;
+
             return Task.CompletedTask;
         }
 
