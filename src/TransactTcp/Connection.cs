@@ -232,7 +232,8 @@ namespace TransactTcp
                     {
                         if (_receivedActionStreamAsync != null)
                         {
-                            await _receivedActionStreamAsync(refToThis, new NetworkReadStream(_connectedStream), cancellationToken);
+                            await ServiceRef.CallAndWaitAsync(this, async ()=>
+                                await _receivedActionStreamAsync(refToThis, new NetworkReadStream(_connectedStream), cancellationToken));
                         }
                         else
                         {
@@ -243,8 +244,11 @@ namespace TransactTcp
                     {
                         if (_receivedActionStreamAsync != null)
                         {
+#pragma warning disable IDE0067 // Dispose objects before losing scope
                             var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
-                            await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken);
+#pragma warning restore IDE0067 // Dispose objects before losing scope
+                            await ServiceRef.CallAndWaitAsync(this, async () =>
+                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken));
                             await bufferedStream.FlushAsync();
                         }
                         else
@@ -254,9 +258,10 @@ namespace TransactTcp
                             await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
 
                             if (_receivedActionAsync != null)
-                                await _receivedActionAsync(refToThis, messageBuffer, cancellationToken);
+                                await ServiceRef.CallAndWaitAsync(this, async () =>
+                                    await _receivedActionAsync(refToThis, messageBuffer, cancellationToken));
                             else //if (_receivedAction != null)
-                                _receivedAction(refToThis, messageBuffer);
+                                ServiceRef.CallAndWait(this, () => _receivedAction(refToThis, messageBuffer));
                         }
                     }
                 }
