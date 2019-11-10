@@ -71,11 +71,11 @@ namespace TransactTcp.Tests
 
             int currentMessageSize = -1;
 
-            using var server = TcpConnectionFactory.CreateServer(15001);
+            using var server = TcpConnectionFactory.CreateServer(15021);
 
             using var client = TcpConnectionFactory.CreateClient(
                 IPAddress.Loopback,
-                15001);
+                15021);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -117,8 +117,8 @@ namespace TransactTcp.Tests
 
             int currentMessageSize = -1;
 
-            using var server = TcpConnectionFactory.CreateServer(15001, new ServerConnectionSettings(useBufferedStream: true));
-            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15001, new ClientConnectionSettings(useBufferedStream: true));
+            using var server = TcpConnectionFactory.CreateServer(15022, new ServerConnectionSettings(useBufferedStream: true));
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15022, new ClientConnectionSettings(useBufferedStream: true));
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
