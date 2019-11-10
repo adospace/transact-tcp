@@ -31,9 +31,9 @@ namespace TransactTcp.Tests
 
             const int messageSize = 1024 * 128; //128kb
 
-            using var server = TcpConnectionFactory.CreateServer(15000);
+            using var server = TcpConnectionFactory.CreateServer(15010);
 
-            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15010);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
