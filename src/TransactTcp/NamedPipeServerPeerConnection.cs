@@ -12,28 +12,28 @@ namespace TransactTcp
 {
     internal class NamedPipeServerPeerConnection : Connection
     {
-        private readonly NamedPipeServerStream _pipeConnectedWithClient;
+        private readonly NamedPipeServerStream _streamIn;
+        private readonly NamedPipeServerStream _streamOut;
 
         public NamedPipeServerPeerConnection(
-            NamedPipeServerStream pipeConnectedWithClient, 
+            NamedPipeServerStream streamIn, 
+            NamedPipeServerStream streamOut,
             ConnectionSettings connectionSettings = null) 
             : base(connectionSettings ?? new ServerConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
-            _pipeConnectedWithClient = pipeConnectedWithClient;
+            _streamIn = streamIn;
+            _streamOut = streamOut;
         }
 
-        protected override bool IsStreamConnected => (_pipeConnectedWithClient?.IsConnected).GetValueOrDefault();
+        protected override bool IsStreamConnected => (_streamIn?.IsConnected).GetValueOrDefault() && (_streamOut?.IsConnected).GetValueOrDefault();
 
         protected override Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            _connectedStream = _pipeConnectedWithClient;
+            _connectedStream = new NamedPipeConnectedStream(_streamIn, _streamOut);
 
             return Task.CompletedTask;
         }
 
-        protected virtual Task<Stream> CreateConnectedStreamAsync(TcpClient tcpClient, CancellationToken cancellationToken)
-        {
-            return Task.FromResult<Stream>(tcpClient.GetStream());
-        }
+
     }
 }

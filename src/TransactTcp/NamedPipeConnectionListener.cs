@@ -12,7 +12,6 @@ namespace TransactTcp
 {
     public class NamedPipeConnectionListener : IConnectionListener
     {
-        private NamedPipeServerStream _pipeServer;
         private readonly string _localEndPointName;
         private readonly ConnectionListenerSettings _settings;
         private CancellationTokenSource _listeningLoopCancellationTokenSource;
@@ -47,6 +46,8 @@ namespace TransactTcp
 
         private async Task ListeningLoopCore()
         {
+            NamedPipeServerStream pipeServerIn = null;
+            NamedPipeServerStream pipeServerOut = null;
 
             try
             {
@@ -56,13 +57,18 @@ namespace TransactTcp
 
                     try
                     {
-                        _pipeServer =
-                            new NamedPipeServerStream(_localEndPointName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                        pipeServerIn =
+                            new NamedPipeServerStream(_localEndPointName + "_IN", PipeDirection.In, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                        pipeServerOut =
+                            new NamedPipeServerStream(_localEndPointName + "_OUT", PipeDirection.Out, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
-                        await _pipeServer.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token);
+                        await Task.WhenAll(
+                            pipeServerIn.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token),
+                            pipeServerOut.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token));
 
                         _connectionCreatedAction.Invoke(this,
-                            ServiceRef.Create<IConnection>(new NamedPipeServerPeerConnection(_pipeServer, _settings.NewConnectionSettings)));
+                            ServiceRef.Create<IConnection>(new NamedPipeServerPeerConnection(
+                                pipeServerIn, pipeServerOut, _settings.NewConnectionSettings)));
                     }
 #if DEBUG
                     catch (InvalidOperationException ex)
@@ -95,7 +101,8 @@ namespace TransactTcp
             }
             finally
             {
-                _pipeServer?.Close();
+                pipeServerIn?.Close();
+                pipeServerOut?.Close();
                 //_listeningLoopCancellationTokenSource = null;
             }
         }

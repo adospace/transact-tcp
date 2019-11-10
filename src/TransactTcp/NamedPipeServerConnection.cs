@@ -10,7 +10,8 @@ namespace TransactTcp
 {
     internal class NamedPipeServerConnection : Connection
     {
-        private NamedPipeServerStream _pipeServer;
+        private NamedPipeServerStream _pipeServerIn;
+        private NamedPipeServerStream _pipeServerOut;
         private readonly string _localEndPointName;
         private readonly ServerConnectionSettings _serverConnectionSettings;
 
@@ -22,12 +23,14 @@ namespace TransactTcp
             _localEndPointName = connectionEndPoint.LocalEndPointName ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPointName");
         }
 
-        protected override bool IsStreamConnected => (_pipeServer?.IsConnected).GetValueOrDefault();
+        protected override bool IsStreamConnected => (_pipeServerIn?.IsConnected).GetValueOrDefault() && (_pipeServerOut?.IsConnected).GetValueOrDefault();
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            _pipeServer =
-                new NamedPipeServerStream(_localEndPointName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            _pipeServerIn =
+                new NamedPipeServerStream(_localEndPointName + "_IN", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            _pipeServerOut =
+                new NamedPipeServerStream(_localEndPointName + "_OUT", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
             if (State == ConnectionState.Connecting)
             {
@@ -35,16 +38,24 @@ namespace TransactTcp
                 using var timeoutCancellationTokenSource =
                     new CancellationTokenSource(_serverConnectionSettings.ConnectionTimeoutMilliseconds);
 
-                timeoutCancellationTokenSource.Token.Register(() => _pipeServer.Close());
+                timeoutCancellationTokenSource.Token.Register(() =>
+                {
+                    _pipeServerIn.Close();
+                    _pipeServerOut.Close();
+                });
 
-                await _pipeServer.WaitForConnectionAsync(cancellationToken);
+                await Task.WhenAll(
+                    _pipeServerIn.WaitForConnectionAsync(cancellationToken),
+                    _pipeServerOut.WaitForConnectionAsync(cancellationToken));
             }
             else // if (State == ConnectionState.LinkError)
             {
-                await _pipeServer.WaitForConnectionAsync(cancellationToken);
+                await Task.WhenAll(
+                    _pipeServerIn.WaitForConnectionAsync(cancellationToken),
+                    _pipeServerOut.WaitForConnectionAsync(cancellationToken));
             }
 
-            _connectedStream = _pipeServer;
+            _connectedStream = new NamedPipeConnectedStream(_pipeServerIn, _pipeServerOut);
         }
 
         protected override void OnDisconnect()

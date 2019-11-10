@@ -437,20 +437,25 @@ namespace TransactTcp
                             throw new InvalidOperationException();
                         }                
 
-                        await _connectedStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken)
-                            .AsTask();
+                        await _connectedStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
                         await _connectedStream?.WriteAsync(data, cancellationToken).AsTask();
                     }
                 }
+#if DEBUG
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
+#else
                 catch (Exception)
                 {
+#endif
                     _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
                 }
             }
         }
 #endif
 
-        public async Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken)
+                    public async Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken)
         {
             if (sendFunction == null)
             {

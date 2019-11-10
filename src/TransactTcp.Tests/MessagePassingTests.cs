@@ -693,12 +693,12 @@ namespace TransactTcp.Tests
                 );
 
 
-            WaitHandle.WaitAll(new[] { client1ConnectedEvent, client2ConnectedEvent, serverConnectedEvent }, 40000).ShouldBeTrue();
+            WaitHandle.WaitAll(new[] { client1ConnectedEvent, client2ConnectedEvent, serverConnectedEvent }, 10000).ShouldBeTrue();
 
             await client1.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT1")));
             await client2.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT2")));
 
-            WaitHandle.WaitAll(new[] { receivedClient1BackFromServerEvent, receivedClient2BackFromServerEvent }, 100000).ShouldBeTrue();
+            WaitHandle.WaitAll(new[] { receivedClient1BackFromServerEvent, receivedClient2BackFromServerEvent }, 10000).ShouldBeTrue();
 
             multiPeerServer.Stop();
         }

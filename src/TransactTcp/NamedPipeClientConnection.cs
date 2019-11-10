@@ -17,7 +17,8 @@ namespace TransactTcp
     {
         private readonly string _remoteNamedPipeName;
         private readonly string _remoteNamedPipeHost;
-        private NamedPipeClientStream _pipeClient;
+        private NamedPipeClientStream _pipeClientIn;
+        private NamedPipeClientStream _pipeClientOut;
         private readonly ClientConnectionSettings _clientConnectionSettings;
 
         public NamedPipeClientConnection(
@@ -29,27 +30,36 @@ namespace TransactTcp
             _remoteNamedPipeHost = connectionEndPoint.RemoteEndPointHost ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPointName));
         }
 
-        protected override bool IsStreamConnected => (_pipeClient?.IsConnected).GetValueOrDefault();
+        protected override bool IsStreamConnected => (_pipeClientIn?.IsConnected).GetValueOrDefault() && (_pipeClientOut?.IsConnected).GetValueOrDefault();
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            _pipeClient =
-                    new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName,
-                        PipeDirection.InOut, PipeOptions.Asynchronous,
+            _pipeClientIn =
+                    new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName + "_OUT",
+                        PipeDirection.In, PipeOptions.Asynchronous,
                         TokenImpersonationLevel.Impersonation);
+
+            _pipeClientOut =
+                new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName + "_IN",
+                    PipeDirection.Out, PipeOptions.Asynchronous,
+                    TokenImpersonationLevel.Impersonation);
 
             cancellationToken.ThrowIfCancellationRequested();
 
             if (_connectionStateMachine.State == ConnectionState.Connecting)
             {
-                await _pipeClient.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
+                await Task.WhenAll(
+                    _pipeClientIn.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken),
+                    _pipeClientOut.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken));
             }
             else
             {
-                await _pipeClient.ConnectAsync(cancellationToken);
+                await Task.WhenAll(
+                    _pipeClientIn.ConnectAsync(cancellationToken),
+                    _pipeClientOut.ConnectAsync(cancellationToken));
             }
 
-            _connectedStream = _pipeClient;
+            _connectedStream = new NamedPipeConnectedStream(_pipeClientIn, _pipeClientOut);
         }
 
         protected override void OnDisconnect()
