@@ -54,7 +54,7 @@ namespace TransactTcp
                 {
                     System.Diagnostics.Debug.WriteLine($"({GetType()}){Environment.NewLine}{ex}");
 #else
-                catch (Exception ex)
+                catch (Exception)
                 {
 #endif
                 }

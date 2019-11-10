@@ -14,9 +14,9 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = TcpConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15007);
 
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15007);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -50,7 +50,7 @@ namespace TransactTcp.Tests
         public void CancelServerPendingConnectionShouldJustWork()
         {
             using var serverStateChangedEvent = new AutoResetEvent(false);
-            var server = TcpConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15001);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -68,7 +68,7 @@ namespace TransactTcp.Tests
         public void CancelClientPendingConnectionShouldJustWork()
         {
             using var clientStateChangedEvent = new AutoResetEvent(false);
-            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15002);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -89,11 +89,11 @@ namespace TransactTcp.Tests
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
             var server = TcpConnectionFactory.CreateServer(
-                15000);
+                15003);
 
             var client = TcpConnectionFactory.CreateClient(
                 IPAddress.Loopback,
-                15000);
+                15003);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -129,9 +129,9 @@ namespace TransactTcp.Tests
             using var serverStateChangedEvent = new AutoResetEvent(false);
             using var clientStateChangedEvent = new AutoResetEvent(false);
 
-            var server = TcpConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15004);
 
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15004);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -216,7 +216,7 @@ namespace TransactTcp.Tests
         [TestMethod]
         public void ClientShouldMoveStateToLinkErrorIfServerDoesntExist()
         {
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15005);
             using var connectionLinkErrorEvent = new AutoResetEvent(false);
             using var connectionOkEvent = new AutoResetEvent(false);
 
@@ -230,7 +230,7 @@ namespace TransactTcp.Tests
 
             connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
 
-            var server = TcpConnectionFactory.CreateServer(15000);
+            var server = TcpConnectionFactory.CreateServer(15005);
 
             server.Start();
 
@@ -264,7 +264,7 @@ namespace TransactTcp.Tests
         [TestMethod]
         public void ServerShouldMoveStateToLinkErrorIfClientDoesntConnect()
         {
-            var server = TcpConnectionFactory.CreateServer(15000, new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
+            var server = TcpConnectionFactory.CreateServer(15006, new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
             using var connectionLinkErrorEvent = new AutoResetEvent(false);
             using var connectionOkEvent = new AutoResetEvent(false);
 
@@ -278,7 +278,7 @@ namespace TransactTcp.Tests
 
             connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
 
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15000);
+            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15006);
 
             client.Start();
 
