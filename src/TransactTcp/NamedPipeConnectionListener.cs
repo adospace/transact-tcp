@@ -62,9 +62,11 @@ namespace TransactTcp
                         pipeServerOut =
                             new NamedPipeServerStream(_localEndPointName + "_OUT", PipeDirection.Out, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
-                        await Task.WhenAll(
-                            pipeServerIn.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token),
-                            pipeServerOut.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token));
+                        await pipeServerIn.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token);
+
+                        _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+
+                        await pipeServerOut.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token);
 
                         _connectionCreatedAction.Invoke(this,
                             ServiceRef.Create<IConnection>(new NamedPipeServerPeerConnection(

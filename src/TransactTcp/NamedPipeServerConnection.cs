@@ -44,15 +44,13 @@ namespace TransactTcp
                     _pipeServerOut.Close();
                 });
 
-                await Task.WhenAll(
-                    _pipeServerIn.WaitForConnectionAsync(cancellationToken),
-                    _pipeServerOut.WaitForConnectionAsync(cancellationToken));
+                await _pipeServerIn.WaitForConnectionAsync(cancellationToken);
+                await _pipeServerOut.WaitForConnectionAsync(cancellationToken);
             }
             else // if (State == ConnectionState.LinkError)
             {
-                await Task.WhenAll(
-                    _pipeServerIn.WaitForConnectionAsync(cancellationToken),
-                    _pipeServerOut.WaitForConnectionAsync(cancellationToken));
+                await _pipeServerIn.WaitForConnectionAsync(cancellationToken);
+                await _pipeServerOut.WaitForConnectionAsync(cancellationToken);
             }
 
             _connectedStream = new NamedPipeConnectedStream(_pipeServerIn, _pipeServerOut);

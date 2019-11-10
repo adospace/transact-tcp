@@ -48,15 +48,13 @@ namespace TransactTcp
 
             if (_connectionStateMachine.State == ConnectionState.Connecting)
             {
-                await Task.WhenAll(
-                    _pipeClientIn.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken),
-                    _pipeClientOut.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken));
+                await _pipeClientIn.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
+                await _pipeClientOut.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
             }
             else
             {
-                await Task.WhenAll(
-                    _pipeClientIn.ConnectAsync(cancellationToken),
-                    _pipeClientOut.ConnectAsync(cancellationToken));
+                await _pipeClientIn.ConnectAsync(cancellationToken);
+                await _pipeClientOut.ConnectAsync(cancellationToken);
             }
 
             _connectedStream = new NamedPipeConnectedStream(_pipeClientIn, _pipeClientOut);
