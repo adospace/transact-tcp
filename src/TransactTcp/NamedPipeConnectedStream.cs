@@ -30,6 +30,12 @@ namespace TransactTcp
 
         public override void Flush() => _outStream.Flush();
 
+        public override bool CanTimeout => _inStream.CanTimeout && _outStream.CanTimeout;
+
+        public override int ReadTimeout { get => _inStream.ReadTimeout; set => _inStream.ReadTimeout = value; }
+
+        public override int WriteTimeout { get => _outStream.WriteTimeout; set => _outStream.WriteTimeout = value; }
+
         public override int Read(byte[] buffer, int offset, int count) =>
             _inStream.Read(buffer, offset, count);
 

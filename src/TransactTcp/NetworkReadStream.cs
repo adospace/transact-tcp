@@ -27,6 +27,12 @@ namespace TransactTcp
 
         public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
+        public override bool CanTimeout => _innerStream.CanTimeout;
+
+        public override int ReadTimeout { get => _innerStream.ReadTimeout; set => _innerStream.ReadTimeout = value; }
+
+        public override int WriteTimeout { get => _innerStream.WriteTimeout; set => _innerStream.WriteTimeout = value; }
+
         public override void Flush()
         {
             throw new NotSupportedException();

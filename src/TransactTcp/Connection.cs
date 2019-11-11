@@ -25,9 +25,10 @@ namespace TransactTcp
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
         private CancellationTokenSource _sendKeepAliveLoopCancellationTokenSource;
         protected readonly StateMachine<ConnectionState, ConnectionTrigger> _connectionStateMachine;
-        
+
         protected Stream _connectedStream;
-        private Stream _sendingBufferedStream;
+        private Stream _sendingStream;
+        private Stream _receivingStream;
 
         private AutoResetEvent _sendKeepAliveResetEvent;
         private Task _receiveLoopTask;
@@ -122,7 +123,7 @@ namespace TransactTcp
                 });
         }
 
-        private void SendKeepAliveLoopAsync()
+        private async Task SendKeepAliveLoopAsync()
         {
             try
             {
@@ -153,18 +154,11 @@ namespace TransactTcp
                     {
                         _sendKeepAliveLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
-                        ServiceRef.Call(this, async () =>
+                        await ServiceRef.CallAndWaitAsync(this, async () =>
                         {
                             if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
                             {
-                                if (_connectionSettings.UseBufferedStream)
-                                {
-                                    await _sendingBufferedStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
-                                }
-                                else
-                                {
-                                    await _connectedStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
-                                }
+                                await _sendingStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
                             }
                         });
                     }
@@ -183,7 +177,7 @@ namespace TransactTcp
 #endif
                 //_sendKeepAliveLoopCancellationTokenSource = null;
                 //_sendKeepAliveResetEvent = null;
-                
+
                 ServiceRef.Call(this, () =>
                 {
                     if (_connectionStateMachine.State == ConnectionState.Connected)
@@ -220,7 +214,7 @@ namespace TransactTcp
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await _connectedStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
+                    await _receivingStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
 
                     var messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
                     if (messageLength == 0)
@@ -232,8 +226,8 @@ namespace TransactTcp
                     {
                         if (_receivedActionStreamAsync != null)
                         {
-                            await ServiceRef.CallAndWaitAsync(this, async ()=>
-                                await _receivedActionStreamAsync(refToThis, new NetworkReadStream(_connectedStream), cancellationToken));
+                            await ServiceRef.CallAndWaitAsync(this, async () =>
+                                await _receivedActionStreamAsync(refToThis, _receivingStream, cancellationToken));
                         }
                         else
                         {
@@ -245,7 +239,7 @@ namespace TransactTcp
                         if (_receivedActionStreamAsync != null)
                         {
 #pragma warning disable IDE0067 // Dispose objects before losing scope
-                            var bufferedStream = new NetworkBufferedReadStream(_connectedStream, messageLength);
+                            var bufferedStream = new NetworkBufferedReadStream(_receivingStream, messageLength);
 #pragma warning restore IDE0067 // Dispose objects before losing scope
                             await ServiceRef.CallAndWaitAsync(this, async () =>
                                 await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken));
@@ -255,7 +249,7 @@ namespace TransactTcp
                         {
                             var messageBuffer = new byte[messageLength];
 
-                            await _connectedStream.ReadBufferedAsync(messageBuffer, cancellationToken);
+                            await _receivingStream.ReadBufferedAsync(messageBuffer, cancellationToken);
 
                             if (_receivedActionAsync != null)
                                 await ServiceRef.CallAndWaitAsync(this, async () =>
@@ -309,7 +303,7 @@ namespace TransactTcp
 
             _connectedStream?.Close();
             _connectedStream = null;
-            _sendingBufferedStream = null;
+            _sendingStream = null;
         }
 
         protected abstract bool IsStreamConnected { get; }
@@ -326,9 +320,9 @@ namespace TransactTcp
                     _connectCancellationTokenSource.Dispose();
                     _connectCancellationTokenSource = null;
                 }
-            
+
                 _connectCancellationTokenSource = new CancellationTokenSource();
-                
+
                 await OnConnectAsync(_connectCancellationTokenSource.Token);
 
                 _connectCancellationTokenSource.Token.ThrowIfCancellationRequested();
@@ -337,8 +331,13 @@ namespace TransactTcp
 
                 if (_connectionSettings.UseBufferedStream)
                 {
-                    _sendingBufferedStream = new BufferedStream(_connectedStream);
-                    _connectedStream = new BufferedStream(_connectedStream);
+                    _sendingStream = new NetworkWriteStream(new BufferedStream(_connectedStream));
+                    _receivingStream = new NetworkReadStream(new BufferedStream(_connectedStream));
+                }
+                else
+                { 
+                    _sendingStream = new NetworkWriteStream(_connectedStream);
+                    _receivingStream = new NetworkReadStream(_connectedStream);
                 }
 
                 ServiceRef.Call(this, () =>
@@ -391,17 +390,18 @@ namespace TransactTcp
 
                 try
                 {
-                    if (_connectionSettings.UseBufferedStream)
-                    {
-                        _sendingBufferedStream?.Write(lenInBytes, 0, 4);
-                        _sendingBufferedStream?.Write(data, 0, data.Length);
-                        await _sendingBufferedStream?.FlushAsync(cancellationToken);
-                    }
-                    else
-                    {
-                        await _connectedStream?.WriteAsync(lenInBytes, 0, 4, cancellationToken);
-                        await _connectedStream?.WriteAsync(data, 0, data.Length, cancellationToken);
-                    }
+                    //if (_connectionSettings.UseBufferedStream)
+                    //{
+                    //    _sendingStream?.Write(lenInBytes, 0, 4);
+                    //    _sendingStream?.Write(data, 0, data.Length);
+                    //    await _sendingStream?.FlushAsync(cancellationToken);
+                    //}
+                    //else
+                    //{
+                        await _sendingStream?.WriteAsync(lenInBytes, 0, 4, cancellationToken);
+                        await _sendingStream?.WriteAsync(data, 0, data.Length, cancellationToken);
+                        await _sendingStream?.FlushAsync(cancellationToken);
+                    //}
                 }
                 catch (Exception)
                 {
@@ -421,15 +421,15 @@ namespace TransactTcp
 
                 try
                 {
-                    if (_connectionSettings.UseBufferedStream)
-                    {
-                        var lenInBytes = BitConverter.GetBytes(data.Length);
-                        _sendingBufferedStream?.Write(lenInBytes, 0, 4);
-                        _sendingBufferedStream?.Write(data.ToArray());
-                        await _sendingBufferedStream?.FlushAsync();
-                    }
-                    else
-                    {
+                    //if (_connectionSettings.UseBufferedStream)
+                    //{
+                    //    var lenInBytes = BitConverter.GetBytes(data.Length);
+                    //    _sendingStream?.Write(lenInBytes, 0, 4);
+                    //    _sendingStream?.Write(data.ToArray());
+                    //    await _sendingStream?.FlushAsync();
+                    //}
+                    //else
+                    //{
                         using var memoryBufferOwner = MemoryPool<byte>.Shared.Rent(4);
 
                         if (!BitConverter.TryWriteBytes(memoryBufferOwner.Memory.Span, data.Length))
@@ -437,9 +437,10 @@ namespace TransactTcp
                             throw new InvalidOperationException();
                         }                
 
-                        await _connectedStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
-                        await _connectedStream?.WriteAsync(data, cancellationToken).AsTask();
-                    }
+                        await _sendingStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
+                        await _sendingStream?.WriteAsync(data, cancellationToken).AsTask();
+                        await _sendingStream?.FlushAsync();
+                    //}
                 }
 #if DEBUG
                 catch (Exception ex)
@@ -455,7 +456,7 @@ namespace TransactTcp
         }
 #endif
 
-                    public async Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken)
+        public async Task SendAsync(Func<Stream, CancellationToken, Task> sendFunction, CancellationToken cancellationToken)
         {
             if (sendFunction == null)
             {
@@ -468,17 +469,18 @@ namespace TransactTcp
 
                 try
                 {
-                    if (_connectionSettings.UseBufferedStream)
-                    {
-                        _sendingBufferedStream?.Write(_nullLength, 0, 4);
-                        await sendFunction(new NetworkWriteStream(_sendingBufferedStream), cancellationToken);
-                        await _sendingBufferedStream.FlushAsync();
-                    }
-                    else
-                    {
-                        await _connectedStream?.WriteAsync(_nullLength, 0, 4, cancellationToken);
-                        await sendFunction(new NetworkWriteStream(_connectedStream), cancellationToken);
-                    }
+                    //if (_connectionSettings.UseBufferedStream)
+                    //{
+                    //    _sendingStream?.Write(_nullLength, 0, 4);
+                    //    await sendFunction(_sendingStream, cancellationToken);
+                    //    await _sendingStream.FlushAsync();
+                    //}
+                    //else
+                    //{
+                        await _sendingStream?.WriteAsync(_nullLength, 0, 4, cancellationToken);
+                        await sendFunction(_sendingStream, cancellationToken);
+                        await _sendingStream.FlushAsync();
+                    //}
                 }
 #if DEBUG
                 catch (Exception ex)
@@ -502,7 +504,7 @@ namespace TransactTcp
             _receivedActionAsync = receivedActionAsync ?? _receivedActionAsync;
             _receivedActionStreamAsync = receivedActionStreamAsync ?? _receivedActionStreamAsync;
 
-            if (new [] { _receivedAction != null, _receivedActionAsync != null, _receivedActionStreamAsync != null }.Count(_=>_) > 1)
+            if (new[] { _receivedAction != null, _receivedActionAsync != null, _receivedActionStreamAsync != null }.Count(_ => _) > 1)
             {
                 throw new InvalidOperationException("No more than one received action can be specified");
             }
@@ -517,7 +519,7 @@ namespace TransactTcp
                 _connectionStateMachine.Fire(ConnectionTrigger.Disconnect);
         }
 
-#region IDisposable Support
+        #region IDisposable Support
         private bool _disposedValue = false; // To detect redundant calls
 
         protected virtual void Dispose(bool disposing)
@@ -559,6 +561,6 @@ namespace TransactTcp
             // TODO: uncomment the following line if the finalizer is overridden above.
             // GC.SuppressFinalize(this);
         }
-#endregion
+        #endregion
     }
 }
