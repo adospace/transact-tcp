@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
+    [KeepAsyncContext(false)]
     public interface IConnection : IDisposable
     {
         void Start(Action<IConnection, byte[]> receivedAction = null,

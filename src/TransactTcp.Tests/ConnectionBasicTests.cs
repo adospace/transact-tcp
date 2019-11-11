@@ -1,216 +1,161 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Nito.AsyncEx;
+using Serilog;
 using Shouldly;
 using System.Net;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace TransactTcp.Tests
 {
     [TestClass]
     public class ConnectionBasicTests
     {
+        private static ILogger _logger = Log.ForContext<ConnectionBasicTests>();
+
         [TestMethod]
         public void ServerAndClientShouldConnectAndDisconnectWithoutErrors()
         {
-            using var serverStateChangedEvent = new AutoResetEvent(false);
-            using var clientStateChangedEvent = new AutoResetEvent(false);
-
-            var server = TcpConnectionFactory.CreateServer(15007);
-
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15007);
+            using var server = TcpConnectionFactory.CreateServer(15007);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15007);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
-                    serverStateChangedEvent.Set();
             });
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
-                    clientStateChangedEvent.Set();
             });
 
-            serverStateChangedEvent.WaitOne(100000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(100000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Connected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Connected);
 
             server.Stop();
             client.Stop();
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Disconnected);
         }
 
         [TestMethod]
         public void CancelServerPendingConnectionShouldJustWork()
         {
-            using var serverStateChangedEvent = new AutoResetEvent(false);
-            var server = TcpConnectionFactory.CreateServer(15001);
+            using var server = TcpConnectionFactory.CreateServer(15001);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Disconnected)
-                    serverStateChangedEvent.Set();
             });
 
             server.Stop();
 
-            serverStateChangedEvent.WaitOne(100000).ShouldBeTrue();
-            server.State.ShouldBe(ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
         }
 
         [TestMethod]
         public void CancelClientPendingConnectionShouldJustWork()
         {
-            using var clientStateChangedEvent = new AutoResetEvent(false);
             using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15002);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Disconnected)
-                    clientStateChangedEvent.Set();
             });
 
             client.Stop();
 
-            clientStateChangedEvent.WaitOne(100000).ShouldBeTrue();
-            client.State.ShouldBe(ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Disconnected);
         }
 
         [TestMethod]
         public void StartServerAfterClientShouldWork()
         {
-            using var serverStateChangedEvent = new AutoResetEvent(false);
-            using var clientStateChangedEvent = new AutoResetEvent(false);
-
-            var server = TcpConnectionFactory.CreateServer(
+            using var server = TcpConnectionFactory.CreateServer(
                 15003);
 
-            var client = TcpConnectionFactory.CreateClient(
+            using var client = TcpConnectionFactory.CreateClient(
                 IPAddress.Loopback,
                 15003);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
-                    clientStateChangedEvent.Set();
             });
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
-                    serverStateChangedEvent.Set();
             });
 
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Connected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Connected);
 
             server.Stop();
             client.Stop();
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
         }
 
         [TestMethod]
         public void ClientShouldReconnectToServerAfterServerRestart()
         {
-            using var serverStateChangedEvent = new AutoResetEvent(false);
-            using var clientStateChangedEvent = new AutoResetEvent(false);
+            _logger.Verbose("Begin test ClientShouldReconnectToServerAfterServerRestart");
 
-            var server = TcpConnectionFactory.CreateServer(15004);
-
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15004);
+            using var server = TcpConnectionFactory.CreateServer(15004);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15004);
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                    serverStateChangedEvent.Set();
+                _logger.Verbose($"Server state change from {fromState} to {toState}");
             });
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected || toState == ConnectionState.LinkError)
-                    clientStateChangedEvent.Set();
+                _logger.Verbose($"Client state change from {fromState} to {toState}");
             });
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            AssertEx.IsTrue(()=> server.State == ConnectionState.Connected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Connected);
 
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
-
+            _logger.Verbose($"Stop server");
             server.Stop();
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.LinkError);
 
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.LinkError);
-
+            _logger.Verbose($"Start server");
             server.Start();
-            
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
 
+            _logger.Verbose($"Stop server");
             server.Stop();
+            _logger.Verbose($"Stop client");
             client.Stop();
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Disconnected);
 
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.Disconnected);
-
+            _logger.Verbose("End test ClientShouldReconnectToServerAfterServerRestart");
         }
 
         [TestMethod]
         public void NamedPipeServerAndClientShouldConnectAndDisconnectWithoutErrors()
         {
-            using var serverStateChangedEvent = new AutoResetEvent(false);
-            using var clientStateChangedEvent = new AutoResetEvent(false);
-
             using var server = NamedPipeConnectionFactory.CreateServer("NamedPipeServerAndClientShouldConnectAndDisconnectWithoutErrors");
-
             using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeServerAndClientShouldConnectAndDisconnectWithoutErrors");
 
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
-                    serverStateChangedEvent.Set();
             });
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.Connected || toState == ConnectionState.Disconnected)
-                    clientStateChangedEvent.Set();
             });
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Connected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Connected);
 
             server.Stop();
             client.Stop();
 
-            serverStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-            clientStateChangedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Disconnected);
         }
 
         [TestMethod]

@@ -451,11 +451,6 @@ namespace TransactTcp.Tests
         [TestMethod]
         public async Task NamedPipeConnectionPointPointShouldSendAndReceiveMessages()
         {
-            using var serverConnectedEvent = new AutoResetEvent(false);
-            using var clientConnectedEvent = new AutoResetEvent(false);
-            using var serverDisconnectedEvent = new AutoResetEvent(false);
-            using var clientDisconnectedEvent = new AutoResetEvent(false);
-
             using var server = NamedPipeConnectionFactory.CreateServer("NamedPipeConnectionPointPointShouldSendAndReceiveMessages");
             using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionPointPointShouldSendAndReceiveMessages");
 
@@ -465,10 +460,6 @@ namespace TransactTcp.Tests
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
                 {
                     Debug.WriteLine($"Client state changed to {toState}");
-                    if (toState == ConnectionState.Connected)
-                        clientConnectedEvent.Set();
-                    else if (toState == ConnectionState.Disconnected)
-                        clientDisconnectedEvent.Set();
                 },
                 receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
                 {
@@ -482,10 +473,6 @@ namespace TransactTcp.Tests
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
                 {
                     Debug.WriteLine($"Server state changed to {toState}");
-                    if (toState == ConnectionState.Connected)
-                        serverConnectedEvent.Set();
-                    else if (toState == ConnectionState.Disconnected)
-                        serverDisconnectedEvent.Set();
                 },
                 receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
                 {
@@ -495,11 +482,8 @@ namespace TransactTcp.Tests
                         serverReceivedMessageEvent.Set();
                 });
 
-            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
-            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Connected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Connected);
 
             await server.SendAsync(async (stream, cancellationToken) =>
             {
@@ -518,11 +502,8 @@ namespace TransactTcp.Tests
             server.Stop();
             server.Start();
 
-            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
-            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Connected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Connected);
 
             await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER\n"));
             await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT\n"));
@@ -533,11 +514,8 @@ namespace TransactTcp.Tests
             server.Stop();
             client.Stop();
 
-            serverDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
-            clientDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            AssertEx.IsTrue(() => client.State == ConnectionState.Disconnected);
         }
 
         [TestMethod]
@@ -596,8 +574,8 @@ namespace TransactTcp.Tests
             serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
             clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
 
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            server.WaitForState(ConnectionState.Connected);
+            client.WaitForState(ConnectionState.Connected);
 
             await server.SendAsync(async (stream, cancellationToken) =>
             {
@@ -614,11 +592,8 @@ namespace TransactTcp.Tests
             server.Stop();
             server.Start();
 
-            serverConnectedEvent.WaitOne(10000).ShouldBeTrue();
-            clientConnectedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Connected);
-            client.State.ShouldBe(ConnectionState.Connected);
+            server.WaitForState(ConnectionState.Connected);
+            client.WaitForState(ConnectionState.Connected);
 
             await server.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM SERVER"));
             await client.SendDataAsync(Encoding.UTF8.GetBytes("MESSAGE FROM CLIENT"));
@@ -629,11 +604,8 @@ namespace TransactTcp.Tests
             server.Stop();
             client.Stop();
 
-            serverDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
-            clientDisconnectedEvent.WaitOne(10000).ShouldBeTrue();
-
-            server.State.ShouldBe(ConnectionState.Disconnected);
-            client.State.ShouldBe(ConnectionState.Disconnected);
+            server.WaitForState(ConnectionState.Disconnected);
+            client.WaitForState(ConnectionState.Disconnected);
         }
 
         [TestMethod]
@@ -644,9 +616,9 @@ namespace TransactTcp.Tests
             using var client1 = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionListenerShouldAcceptNewConnection");
             using var client2 = NamedPipeConnectionFactory.CreateClient("NamedPipeConnectionListenerShouldAcceptNewConnection");
 
-            using var serverConnectedEvent = new AutoResetEvent(false);
-            using var client1ConnectedEvent = new AutoResetEvent(false);
-            using var client2ConnectedEvent = new AutoResetEvent(false);
+            //using var serverConnectedEvent = new AutoResetEvent(false);
+            //using var client1ConnectedEvent = new AutoResetEvent(false);
+            //using var client2ConnectedEvent = new AutoResetEvent(false);
             using var receivedClient1BackFromServerEvent = new AutoResetEvent(false);
             using var receivedClient2BackFromServerEvent = new AutoResetEvent(false);
 
@@ -664,7 +636,7 @@ namespace TransactTcp.Tests
                     },
                     connectionStateChangedAction: (c, fromState, toState) =>
                     {
-                        if (toState == ConnectionState.Connected) serverConnectedEvent.Set();
+                        //if (toState == ConnectionState.Connected) serverConnectedEvent.Set();
                     });
             });
 
@@ -677,7 +649,10 @@ namespace TransactTcp.Tests
                     if (Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING FROM CLIENT1")
                         receivedClient1BackFromServerEvent.Set();
                 },
-                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) client1ConnectedEvent.Set(); }
+                connectionStateChangedAction: (c, fromState, toState) => 
+                {
+                    //if (toState == ConnectionState.Connected) client1ConnectedEvent.Set(); 
+                }
                 );
 
             client2.Start(
@@ -689,11 +664,16 @@ namespace TransactTcp.Tests
                     if (Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING FROM CLIENT2")
                         receivedClient2BackFromServerEvent.Set();
                 },
-                connectionStateChangedAction: (c, fromState, toState) => { if (toState == ConnectionState.Connected) client2ConnectedEvent.Set(); }
+                connectionStateChangedAction: (c, fromState, toState) => 
+                {
+                    //if (toState == ConnectionState.Connected) client2ConnectedEvent.Set(); 
+                }
                 );
 
 
-            WaitHandle.WaitAll(new[] { client1ConnectedEvent, client2ConnectedEvent, serverConnectedEvent }, 10000).ShouldBeTrue();
+            //WaitHandle.WaitAll(new[] { client1ConnectedEvent, client2ConnectedEvent, serverConnectedEvent }, 10000).ShouldBeTrue();
+            client1.WaitForState(ConnectionState.Connected);
+            client2.WaitForState(ConnectionState.Connected);
 
             await client1.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT1")));
             await client2.SendDataAsync(new Memory<byte>(Encoding.UTF8.GetBytes("PING FROM CLIENT2")));

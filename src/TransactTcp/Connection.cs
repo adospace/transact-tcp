@@ -1,4 +1,5 @@
-﻿using ServiceActor;
+﻿using Nito.AsyncEx;
+using ServiceActor;
 using Stateless;
 using System;
 using System.Buffers;
@@ -30,11 +31,11 @@ namespace TransactTcp
         private Stream _sendingStream;
         private Stream _receivingStream;
 
-        private AutoResetEvent _sendKeepAliveResetEvent;
+        private AsyncAutoResetEvent _sendKeepAliveResetEvent;
         private Task _receiveLoopTask;
         private Task _sendKeepAliveLoopTask;
-        private AutoResetEvent _receiveLoopTaskIsRunningEvent;
-        private AutoResetEvent _sendKeepAliveTaskIsRunningEvent;
+        private AsyncAutoResetEvent _receiveLoopTaskIsRunningEvent;
+        private AsyncAutoResetEvent _sendKeepAliveTaskIsRunningEvent;
 
         private static readonly byte[] _keepAlivePacket = new byte[] { 0x0, 0x0, 0x0, 0x0 };
 
@@ -83,24 +84,22 @@ namespace TransactTcp
             _connectionStateMachine.Configure(ConnectionState.Connected)
                 .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
                 .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
-                .OnEntry(() =>
+                .OnEntryAsync(async () =>
                 {
-                    using (_receiveLoopTaskIsRunningEvent = new AutoResetEvent(false))
-                    using (_sendKeepAliveTaskIsRunningEvent = new AutoResetEvent(false))
-                    {
-                        _receiveLoopTask = Task.Run(ReceiveLoopAsync);
-                        if (_connectionSettings.KeepAliveMilliseconds > 0)
-                        {
-                            _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
-                        }
+                    _receiveLoopTaskIsRunningEvent = new AsyncAutoResetEvent();
+                    _sendKeepAliveTaskIsRunningEvent = new AsyncAutoResetEvent();
 
-                        if (!_receiveLoopTaskIsRunningEvent.WaitOne())
-                            throw new InvalidOperationException();
-                        if (_connectionSettings.KeepAliveMilliseconds > 0)
-                        {
-                            if (!_sendKeepAliveTaskIsRunningEvent.WaitOne())
-                                throw new InvalidOperationException();
-                        }
+                    _receiveLoopTask = Task.Run(ReceiveLoopAsync);
+                    if (_connectionSettings.KeepAliveMilliseconds > 0)
+                    {
+                        _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
+                    }
+
+                    await _receiveLoopTaskIsRunningEvent.WaitAsync();
+
+                    if (_connectionSettings.KeepAliveMilliseconds > 0)
+                    {
+                        await _sendKeepAliveTaskIsRunningEvent.WaitAsync();
                     }
 
                     _receiveLoopTaskIsRunningEvent = null;
@@ -127,13 +126,7 @@ namespace TransactTcp
         {
             try
             {
-                if (_sendKeepAliveResetEvent != null)
-                {
-                    _sendKeepAliveResetEvent.Dispose();
-                    _sendKeepAliveResetEvent = null;
-                }
-
-                _sendKeepAliveResetEvent = new AutoResetEvent(false);
+                _sendKeepAliveResetEvent = new AsyncAutoResetEvent(false);
 
                 if (_sendKeepAliveLoopCancellationTokenSource != null)
                 {
@@ -150,7 +143,7 @@ namespace TransactTcp
 
                 while (true)
                 {
-                    if (!_sendKeepAliveResetEvent.WaitOne(_connectionSettings.KeepAliveMilliseconds))
+                    if (!await _sendKeepAliveResetEvent.WaitAsync(_connectionSettings.KeepAliveMilliseconds))
                     {
                         _sendKeepAliveLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
 
@@ -178,10 +171,10 @@ namespace TransactTcp
                 //_sendKeepAliveLoopCancellationTokenSource = null;
                 //_sendKeepAliveResetEvent = null;
 
-                ServiceRef.Call(this, () =>
+                ServiceRef.Call(this, async () =>
                 {
                     if (_connectionStateMachine.State == ConnectionState.Connected)
-                        _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                        await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
                 });
             }
             finally
@@ -273,10 +266,10 @@ namespace TransactTcp
 #endif
                 //_receiveLoopCancellationTokenSource = null;
 
-                ServiceRef.Call(this, () =>
+                ServiceRef.Call(this, async () =>
                 {
                     if (_connectionStateMachine.State == ConnectionState.Connected)
-                        _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                        await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
                 });
             }
             finally
@@ -340,12 +333,12 @@ namespace TransactTcp
                     _receivingStream = new NetworkReadStream(_connectedStream);
                 }
 
-                ServiceRef.Call(this, () =>
+                ServiceRef.Call(this, async () =>
                 {
                     if (_connectionStateMachine.State == ConnectionState.Connecting ||
                         _connectionStateMachine.State == ConnectionState.LinkError)
                     {
-                        _connectionStateMachine.Fire(ConnectionTrigger.Connected);
+                        await _connectionStateMachine.FireAsync(ConnectionTrigger.Connected);
                     }
                 });
             }
@@ -360,10 +353,10 @@ namespace TransactTcp
             catch (Exception)
             {
 #endif
-                ServiceRef.Call(this, () =>
+                ServiceRef.Call(this, async () =>
                 {
                     if (_connectionStateMachine.State == ConnectionState.Connecting)
-                        _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                        await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
                 });
             }
             finally
@@ -405,7 +398,7 @@ namespace TransactTcp
                 }
                 catch (Exception)
                 {
-                    _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                    await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
                 }
             }
         }
@@ -450,7 +443,7 @@ namespace TransactTcp
                 catch (Exception)
                 {
 #endif
-                    _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                    await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
                 }
             }
         }
@@ -490,7 +483,7 @@ namespace TransactTcp
                 catch (Exception)
                 {
 #endif
-                    _connectionStateMachine.Fire(ConnectionTrigger.LinkError);
+                    await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
                 }
             }
         }
@@ -535,7 +528,7 @@ namespace TransactTcp
                     _sendKeepAliveLoopCancellationTokenSource = null;
                     _receiveLoopCancellationTokenSource?.Dispose();
                     _receiveLoopCancellationTokenSource = null;
-                    _sendKeepAliveResetEvent?.Dispose();
+                    //_sendKeepAliveResetEvent?.Dispose();
                     _sendKeepAliveResetEvent = null;
                 }
 
