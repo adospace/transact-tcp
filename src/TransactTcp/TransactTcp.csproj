@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.0.0" />
-    <PackageReference Include="ServiceActor" Version="1.0.68" />
+    <PackageReference Include="ServiceActor" Version="1.0.69" />
     <PackageReference Include="Stateless" Version="4.2.1" />
   </ItemGroup>
 

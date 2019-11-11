@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace TransactTcp
 {
-    internal static class AsyncAutoResetEventExtensions
+    public static class AsyncAutoResetEventExtensions
     {
         public static Task<bool> WaitAsync(this AsyncAutoResetEvent autoResetEvent, int timeout, CancellationToken cancellationToken = default) => Task.FromResult(
                 0 == (Task.WaitAny(autoResetEvent.WaitAsync(cancellationToken), Task.Delay(timeout, cancellationToken))));
