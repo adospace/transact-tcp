@@ -335,7 +335,7 @@ namespace TransactTcp
                     _receivingStream = new NetworkReadStream(new BufferedStream(_connectedStream));
                 }
                 else
-                { 
+                {
                     _sendingStream = new NetworkWriteStream(_connectedStream);
                     _receivingStream = new NetworkReadStream(_connectedStream);
                 }
@@ -398,9 +398,9 @@ namespace TransactTcp
                     //}
                     //else
                     //{
-                        await _sendingStream?.WriteAsync(lenInBytes, 0, 4, cancellationToken);
-                        await _sendingStream?.WriteAsync(data, 0, data.Length, cancellationToken);
-                        await _sendingStream?.FlushAsync(cancellationToken);
+                    await _sendingStream?.WriteAsync(lenInBytes, 0, 4, cancellationToken);
+                    await _sendingStream?.WriteAsync(data, 0, data.Length, cancellationToken);
+                    await _sendingStream?.FlushAsync(cancellationToken);
                     //}
                 }
                 catch (Exception)
@@ -430,16 +430,16 @@ namespace TransactTcp
                     //}
                     //else
                     //{
-                        using var memoryBufferOwner = MemoryPool<byte>.Shared.Rent(4);
+                    using var memoryBufferOwner = MemoryPool<byte>.Shared.Rent(4);
 
-                        if (!BitConverter.TryWriteBytes(memoryBufferOwner.Memory.Span, data.Length))
-                        {
-                            throw new InvalidOperationException();
-                        }                
+                    if (!BitConverter.TryWriteBytes(memoryBufferOwner.Memory.Span, data.Length))
+                    {
+                        throw new InvalidOperationException();
+                    }
 
-                        await _sendingStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
-                        await _sendingStream?.WriteAsync(data, cancellationToken).AsTask();
-                        await _sendingStream?.FlushAsync();
+                    await _sendingStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
+                    await _sendingStream?.WriteAsync(data, cancellationToken).AsTask();
+                    await _sendingStream?.FlushAsync();
                     //}
                 }
 #if DEBUG
@@ -471,15 +471,15 @@ namespace TransactTcp
                 {
                     //if (_connectionSettings.UseBufferedStream)
                     //{
-                    //    _sendingStream?.Write(_nullLength, 0, 4);
+                    _sendingStream?.Write(_nullLength, 0, 4);
                     //    await sendFunction(_sendingStream, cancellationToken);
                     //    await _sendingStream.FlushAsync();
                     //}
                     //else
                     //{
-                        await _sendingStream?.WriteAsync(_nullLength, 0, 4, cancellationToken);
-                        await sendFunction(_sendingStream, cancellationToken);
-                        await _sendingStream.FlushAsync();
+                    //await _sendingStream?.WriteAsync(_nullLength, 0, 4, cancellationToken);
+                    await sendFunction(_sendingStream, cancellationToken);
+                    await _sendingStream?.FlushAsync();
                     //}
                 }
 #if DEBUG
