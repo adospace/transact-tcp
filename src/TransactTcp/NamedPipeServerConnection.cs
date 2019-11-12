@@ -17,8 +17,11 @@ namespace TransactTcp
 
         public NamedPipeServerConnection(
            NamedPipeConnectionEndPoint connectionEndPoint)
-            : base(connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
+            : base(false, connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
+            if (_connectionSettings.UseBufferedStream)
+                throw new NotSupportedException();
+
             _serverConnectionSettings = (ServerConnectionSettings)_connectionSettings;
             _localEndPointName = connectionEndPoint.LocalEndPointName ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPointName");
         }
@@ -28,9 +31,20 @@ namespace TransactTcp
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
             _pipeServerIn =
-                new NamedPipeServerStream(_localEndPointName + "_IN", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                new NamedPipeServerStream(
+                    _localEndPointName + "_IN_TO_SERVER",
+                    PipeDirection.In,
+                    1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
+
             _pipeServerOut =
-                new NamedPipeServerStream(_localEndPointName + "_OUT", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                new NamedPipeServerStream(
+                    _localEndPointName + "_OUT_FROM_SERVER",
+                    PipeDirection.Out,
+                    1,
+                    PipeTransmissionMode.Byte,
+                    PipeOptions.Asynchronous);
 
             if (State == ConnectionState.Connecting)
             {
@@ -53,12 +67,15 @@ namespace TransactTcp
                 await _pipeServerOut.WaitForConnectionAsync(cancellationToken);
             }
 
-            _connectedStream = new NamedPipeConnectedStream(_pipeServerIn, _pipeServerOut);
+            _connectedStream = new NamedPipeConnectedStream(
+                $"{GetType()}",
+                _localEndPointName + "_IN_TO_SERVER", _pipeServerIn,
+                _localEndPointName + "_OUT_FROM_SERVER", _pipeServerOut);
         }
 
-        protected override void OnDisconnect()
+        protected override void SetState(ConnectionTrigger connectionTrigger)
         {
-            base.OnDisconnect();
+            base.SetState(connectionTrigger);
 
             if (State == ConnectionState.LinkError)
                 BeginConnection();

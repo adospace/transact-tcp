@@ -38,7 +38,7 @@ namespace TransactTcp.Tests
         }
 
         [TestMethod]
-        public void CancelServerPendingConnectionShouldJustWork()
+        public async Task CancelServerPendingConnectionShouldJustWork()
         {
             using var server = TcpConnectionFactory.CreateServer(15001);
 
@@ -48,7 +48,7 @@ namespace TransactTcp.Tests
 
             server.Stop();
 
-            AssertEx.IsTrue(() => server.State == ConnectionState.Disconnected);
+            await server.WaitForStateAsync(ConnectionState.Disconnected);
         }
 
         [TestMethod]
@@ -231,27 +231,20 @@ namespace TransactTcp.Tests
         }
 
         [TestMethod]
-        public void NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect()
+        public async Task NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect()
         {
             var server = NamedPipeConnectionFactory.CreateServer("NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect", new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
-            using var connectionLinkErrorEvent = new AutoResetEvent(false);
-            using var connectionOkEvent = new AutoResetEvent(false);
-
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
-                if (toState == ConnectionState.LinkError)
-                    connectionLinkErrorEvent.Set();
-                else if (toState == ConnectionState.Connected)
-                    connectionOkEvent.Set();
             });
 
-            connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
+            await server.WaitForStateAsync(ConnectionState.LinkError);
 
             var client = NamedPipeConnectionFactory.CreateClient("NamedPipeServerShouldMoveStateToLinkErrorIfClientDoesntConnect");
 
             client.Start();
 
-            connectionOkEvent.WaitOne(10000).ShouldBeTrue();
+            await client.WaitForStateAsync(ConnectionState.Connected);
         }
     }
 }

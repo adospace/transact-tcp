@@ -23,8 +23,11 @@ namespace TransactTcp
 
         public NamedPipeClientConnection(
             NamedPipeConnectionEndPoint connectionEndPoint)
-            : base(connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
+            : base(false, connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
+            if (_connectionSettings.UseBufferedStream)
+                throw new NotSupportedException();
+
             _clientConnectionSettings = (ClientConnectionSettings)_connectionSettings;
             _remoteNamedPipeName = connectionEndPoint.RemoteEndPointName ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPointName));
             _remoteNamedPipeHost = connectionEndPoint.RemoteEndPointHost ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPointName));
@@ -35,37 +38,41 @@ namespace TransactTcp
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
             _pipeClientIn =
-                    new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName + "_OUT",
-                        PipeDirection.In, PipeOptions.Asynchronous,
-                        TokenImpersonationLevel.Impersonation);
+                    new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName + "_OUT_FROM_SERVER",
+                        PipeDirection.In, PipeOptions.Asynchronous);
 
             _pipeClientOut =
-                new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName + "_IN",
-                    PipeDirection.Out, PipeOptions.Asynchronous,
-                    TokenImpersonationLevel.Impersonation);
+                new NamedPipeClientStream(_remoteNamedPipeHost, _remoteNamedPipeName + "_IN_TO_SERVER",
+                    PipeDirection.Out, PipeOptions.Asynchronous);
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (_connectionStateMachine.State == ConnectionState.Connecting)
+            if (State == ConnectionState.Connecting)
             {
-                await _pipeClientIn.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
                 await _pipeClientOut.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
+                await _pipeClientIn.ConnectAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken);
             }
             else
             {
-                await _pipeClientIn.ConnectAsync(cancellationToken);
                 await _pipeClientOut.ConnectAsync(cancellationToken);
+                await _pipeClientIn.ConnectAsync(cancellationToken);
             }
 
-            _connectedStream = new NamedPipeConnectedStream(_pipeClientIn, _pipeClientOut);
+            _connectedStream = new NamedPipeConnectedStream(
+                $"{GetType()}",
+                _remoteNamedPipeName + "_OUT_FROM_SERVER", _pipeClientIn,
+                _remoteNamedPipeName + "_IN_TO_SERVER", _pipeClientOut); ;
+
         }
 
-        protected override void OnDisconnect()
+        protected override void SetState(ConnectionTrigger connectionTrigger)
         {
-            base.OnDisconnect();
+            base.SetState(connectionTrigger);
 
             if (State == ConnectionState.LinkError && _clientConnectionSettings.AutoReconnect)
                 BeginConnection();
         }
+
+
     }
 }

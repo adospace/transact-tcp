@@ -23,6 +23,9 @@ namespace TransactTcp
         {
             _localEndPointName = localEndPointName ?? throw new ArgumentNullException("localEndPointName");
             _settings = settings ?? new ConnectionListenerSettings();
+            
+            if ((_settings.NewConnectionSettings?.UseBufferedStream).GetValueOrDefault())
+                throw new NotSupportedException();
 
             if (string.IsNullOrWhiteSpace(localEndPointName))
             {
@@ -41,10 +44,10 @@ namespace TransactTcp
                 throw new InvalidOperationException();
             }
 
-            _listeningTask = Task.Run(ListeningLoopCore);
+            _listeningTask = Task.Run(() => ListeningLoopCore((_listeningLoopCancellationTokenSource = new CancellationTokenSource()).Token));
         }
 
-        private async Task ListeningLoopCore()
+        private async Task ListeningLoopCore(CancellationToken cancellationToken)
         {
             NamedPipeServerStream pipeServerIn = null;
             NamedPipeServerStream pipeServerOut = null;
@@ -53,20 +56,24 @@ namespace TransactTcp
             {
                 while (true)
                 {
-                    _listeningLoopCancellationTokenSource = new CancellationTokenSource();
-
                     try
                     {
                         pipeServerIn =
-                            new NamedPipeServerStream(_localEndPointName + "_IN", PipeDirection.In, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                            new NamedPipeServerStream(_localEndPointName + "_IN_TO_SERVER", 
+                            PipeDirection.In, 
+                            NamedPipeServerStream.MaxAllowedServerInstances, 
+                            PipeTransmissionMode.Byte, 
+                            PipeOptions.Asynchronous);
+
                         pipeServerOut =
-                            new NamedPipeServerStream(_localEndPointName + "_OUT", PipeDirection.Out, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                            new NamedPipeServerStream(_localEndPointName + "_OUT_FROM_SERVER", 
+                            PipeDirection.Out, 
+                            NamedPipeServerStream.MaxAllowedServerInstances, 
+                            PipeTransmissionMode.Byte, 
+                            PipeOptions.Asynchronous);
 
-                        await pipeServerIn.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token);
-
-                        _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
-
-                        await pipeServerOut.WaitForConnectionAsync(_listeningLoopCancellationTokenSource.Token);
+                        await pipeServerIn.WaitForConnectionAsync(cancellationToken);
+                        await pipeServerOut.WaitForConnectionAsync(cancellationToken);
 
                         _connectionCreatedAction.Invoke(this,
                             ServiceRef.Create<IConnection>(new NamedPipeServerPeerConnection(
@@ -80,15 +87,14 @@ namespace TransactTcp
                     catch (InvalidOperationException)
                     {
 #endif
-                        _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
                         throw;
                     }
                     finally
                     {
                     }
-                    
 
-                    _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
             }
             catch (OperationCanceledException)
@@ -112,7 +118,7 @@ namespace TransactTcp
         public void Stop()
         {
             _listeningLoopCancellationTokenSource?.Cancel();
-            _listeningTask?.Wait();
+            //_listeningTask?.Wait();
             _listeningLoopCancellationTokenSource = null;
             _listeningTask = null;
         }

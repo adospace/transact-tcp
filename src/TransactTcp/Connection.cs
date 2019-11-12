@@ -25,7 +25,7 @@ namespace TransactTcp
         private CancellationTokenSource _connectCancellationTokenSource;
         private CancellationTokenSource _receiveLoopCancellationTokenSource;
         private CancellationTokenSource _sendKeepAliveLoopCancellationTokenSource;
-        protected readonly StateMachine<ConnectionState, ConnectionTrigger> _connectionStateMachine;
+        //protected readonly StateMachine<ConnectionState, ConnectionTrigger> _connectionStateMachine;
 
         protected Stream _connectedStream;
         private Stream _sendingStream;
@@ -39,102 +39,281 @@ namespace TransactTcp
 
         private static readonly byte[] _keepAlivePacket = new byte[] { 0x0, 0x0, 0x0, 0x0 };
 
+        private readonly bool _messageFramingEnabled = true;
+
         protected Connection(
+            bool messageFramingEnabled,
             ConnectionSettings connectionSettings = null)
         {
+            _messageFramingEnabled = messageFramingEnabled;
             _connectionSettings = connectionSettings ?? new ConnectionSettings();
-            _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
+            //            _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
-            _connectionStateMachine.OnTransitioned((transition) =>
-            {
-                try
-                {
-                    _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination);
-                }
-#if DEBUG
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"({GetType()}){Environment.NewLine}{ex}");
-#else
-                catch (Exception)
-                {
-#endif
-                }
-            });
+            //            _connectionStateMachine.OnTransitionedAsync((transition) =>
+            //            {
+            //                try
+            //                {
+            //                    _connectionStateChangedAction?.Invoke(this, transition.Source, transition.Destination);
+            //                }
+            //#if DEBUG
+            //                catch (Exception ex)
+            //                {
+            //                    System.Diagnostics.Debug.WriteLine($"({GetType()}){Environment.NewLine}{ex}");
+            //#else
+            //                catch (Exception)
+            //                {
+            //#endif
+            //                }
 
-            ConfigureStateMachine();
+            //                return Task.CompletedTask;
+            //            });
+
+            //ConfigureStateMachine();
         }
 
-        protected virtual void ConfigureStateMachine()
+        public ConnectionState State { get; private set; }
+
+        private async Task RunConnection()
         {
-            _connectionStateMachine.Configure(ConnectionState.Disconnected)
-                .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
-                .OnEntryFrom(ConnectionTrigger.Disconnect, () =>
-                {
-                    OnDisconnect();
-                });
+            _receiveLoopTaskIsRunningEvent = new AsyncAutoResetEvent();
+            _sendKeepAliveTaskIsRunningEvent = new AsyncAutoResetEvent();
 
-            _connectionStateMachine.Configure(ConnectionState.Connecting)
-                .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
-                .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
-                .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
-                .OnEntry(() => BeginConnection())
-                .OnExit(() => _connectCancellationTokenSource?.Cancel());
+            _receiveLoopTask = Task.Run(()
+                => ReceiveLoopAsync((_receiveLoopCancellationTokenSource = new CancellationTokenSource()).Token));
 
-            _connectionStateMachine.Configure(ConnectionState.Connected)
-                .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
-                .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
-                .OnEntryAsync(async () =>
-                {
-                    _receiveLoopTaskIsRunningEvent = new AsyncAutoResetEvent();
-                    _sendKeepAliveTaskIsRunningEvent = new AsyncAutoResetEvent();
+            if (_connectionSettings.KeepAliveMilliseconds > 0)
+            {
+                _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync(
+                    _sendKeepAliveResetEvent = new AsyncAutoResetEvent(false),
+                    (_sendKeepAliveLoopCancellationTokenSource = new CancellationTokenSource()).Token));
+            }
 
-                    _receiveLoopTask = Task.Run(ReceiveLoopAsync);
-                    if (_connectionSettings.KeepAliveMilliseconds > 0)
-                    {
-                        _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
-                    }
+            await _receiveLoopTaskIsRunningEvent.WaitAsync().ConfigureAwait(false);
 
-                    await _receiveLoopTaskIsRunningEvent.WaitAsync();
+            if (_connectionSettings.KeepAliveMilliseconds > 0)
+            {
+                await _sendKeepAliveTaskIsRunningEvent.WaitAsync().ConfigureAwait(false);
+            }
 
-                    if (_connectionSettings.KeepAliveMilliseconds > 0)
-                    {
-                        await _sendKeepAliveTaskIsRunningEvent.WaitAsync();
-                    }
-
-                    _receiveLoopTaskIsRunningEvent = null;
-                    _sendKeepAliveTaskIsRunningEvent = null;
-                })
-                .OnExit(() =>
-                {
-                    _receiveLoopCancellationTokenSource?.Cancel();
-                    _sendKeepAliveLoopCancellationTokenSource?.Cancel();
-                    _sendKeepAliveResetEvent?.Set();
-                });
-
-            _connectionStateMachine.Configure(ConnectionState.LinkError)
-                .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
-                .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
-                .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
-                .OnEntryFrom(ConnectionTrigger.LinkError, () =>
-                {
-                    OnDisconnect();
-                });
+            _receiveLoopTaskIsRunningEvent = null;
+            _sendKeepAliveTaskIsRunningEvent = null;
         }
 
-        private async Task SendKeepAliveLoopAsync()
+        protected virtual void SetState(ConnectionTrigger connectionTrigger)
+        {
+            var currentState = State;
+            var newState = State;
+
+            System.Diagnostics.Debug.WriteLine($"{GetType()} SetState({currentState}) -> {connectionTrigger}");
+
+            switch (currentState)
+            {
+                case ConnectionState.Connecting:
+                    {
+                        if (connectionTrigger == ConnectionTrigger.Disconnect)
+                        {
+                            _connectCancellationTokenSource?.Cancel();
+                            OnDisconnect();
+                            newState = ConnectionState.Disconnected;
+                        }
+                        else if (connectionTrigger == ConnectionTrigger.LinkError)
+                        {
+                            _connectCancellationTokenSource?.Cancel();
+                            OnDisconnect();
+                            newState = ConnectionState.LinkError;
+                        }
+                        else if (connectionTrigger == ConnectionTrigger.Connected)
+                        {
+                            newState = ConnectionState.Connected;
+                        }
+                        else throw new InvalidOperationException();
+                    }
+                    break;
+                case ConnectionState.Disconnected:
+                    {
+                        if (connectionTrigger == ConnectionTrigger.Connect)
+                        {
+                            BeginConnection();
+                            newState = ConnectionState.Connecting;
+                        }
+                        else throw new InvalidOperationException();
+                    }
+                    break;
+                case ConnectionState.Connected:
+                    {
+                        if (connectionTrigger == ConnectionTrigger.LinkError)
+                        {
+                            _receiveLoopCancellationTokenSource?.Cancel();
+                            _sendKeepAliveLoopCancellationTokenSource?.Cancel();
+                            _sendKeepAliveResetEvent?.Set();
+                            OnDisconnect();
+                            newState = ConnectionState.LinkError;
+                        }
+                        else if (connectionTrigger == ConnectionTrigger.Disconnect)
+                        {
+                            _connectCancellationTokenSource?.Cancel();
+                            _receiveLoopCancellationTokenSource?.Cancel();
+                            _sendKeepAliveLoopCancellationTokenSource?.Cancel();
+                            _sendKeepAliveResetEvent?.Set();
+                            OnDisconnect();
+                            newState = ConnectionState.Disconnected;
+                        }
+                    }
+                    break;
+                case ConnectionState.LinkError:
+                    {
+                        if (connectionTrigger == ConnectionTrigger.Disconnect)
+                        {
+                            _connectCancellationTokenSource?.Cancel();
+                            _receiveLoopCancellationTokenSource?.Cancel();
+                            _sendKeepAliveLoopCancellationTokenSource?.Cancel();
+                            _sendKeepAliveResetEvent?.Set();
+                            newState = ConnectionState.Disconnected;
+                        }
+                        else if (connectionTrigger == ConnectionTrigger.Connected)
+                        {
+                            newState = ConnectionState.Connected;
+                        }
+
+                    }
+                    break;
+            }
+
+            if (newState == currentState)
+                return;
+
+            State = newState;
+
+            System.Diagnostics.Debug.WriteLine($"{GetType()} SetState({currentState}) -> {connectionTrigger} -> {newState}");
+
+            _connectionStateChangedAction?.Invoke(ServiceRef.Create<IConnection>(this), currentState, newState);
+
+        }
+
+        //protected virtual async Task SetStateAsync(ConnectionTrigger connectionTrigger)
+        //{
+        //    var currentState = State;
+        //    var newState = State;
+
+        //    System.Diagnostics.Debug.WriteLine($"{GetType()} SetStateAsync({currentState}) -> {connectionTrigger}");
+
+        //    switch (currentState)
+        //    {
+        //        case ConnectionState.Connecting:
+        //            {
+        //                if (connectionTrigger == ConnectionTrigger.Connected)
+        //                {
+        //                    await RunConnection();
+        //                    newState = ConnectionState.Connected;
+        //                }
+        //                else throw new InvalidOperationException();
+        //            }
+        //            break;
+        //        case ConnectionState.Disconnected:
+        //            {
+        //                throw new InvalidOperationException();
+        //            }
+        //        case ConnectionState.Connected:
+        //            {
+        //                throw new InvalidOperationException();
+        //            }
+        //        case ConnectionState.LinkError:
+        //            {
+        //                if (connectionTrigger == ConnectionTrigger.Connected)
+        //                {
+        //                    await RunConnection();
+        //                    newState = ConnectionState.Connected;
+        //                }
+        //            }
+        //            break;
+        //    }
+
+        //    if (newState == currentState)
+        //        return;
+
+        //    State = newState;
+
+        //    System.Diagnostics.Debug.WriteLine($"{GetType()} SetState({currentState}) -> {connectionTrigger} -> {newState}");
+
+        //    _connectionStateChangedAction?.Invoke(ServiceRef.Create<IConnection>(this), currentState, newState);
+        //}
+
+        //protected virtual void ConfigureStateMachine()
+        //{
+        //    _connectionStateMachine.Configure(ConnectionState.Disconnected)
+        //        .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
+        //        .OnEntryFromAsync(ConnectionTrigger.Disconnect, async () =>
+        //        {
+        //            await OnDisconnect().ConfigureAwait(false);
+        //        });
+
+        //    _connectionStateMachine.Configure(ConnectionState.Connecting)
+        //        .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
+        //        .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
+        //        .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
+        //        .OnEntryAsync(async () => await ConnectAsyncCore().ConfigureAwait(false))
+        //        .OnExitAsync(() =>
+        //        {
+        //            _connectCancellationTokenSource?.Cancel();
+        //            return Task.CompletedTask;
+        //        })
+        //        .OnExit(() => _connectCancellationTokenSource?.Cancel());
+
+        //    _connectionStateMachine.Configure(ConnectionState.Connected)
+        //        .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
+        //        .Permit(ConnectionTrigger.LinkError, ConnectionState.LinkError)
+        //        .OnEntryAsync(async () =>
+        //        {
+        //            _receiveLoopTaskIsRunningEvent = new AsyncAutoResetEvent();
+        //            _sendKeepAliveTaskIsRunningEvent = new AsyncAutoResetEvent();
+
+        //            _receiveLoopTask = Task.Run(ReceiveLoopAsync);
+        //            if (_connectionSettings.KeepAliveMilliseconds > 0)
+        //            {
+        //                _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync());
+        //            }
+
+        //            await _receiveLoopTaskIsRunningEvent.WaitAsync().ConfigureAwait(false);
+
+        //            if (_connectionSettings.KeepAliveMilliseconds > 0)
+        //            {
+        //                await _sendKeepAliveTaskIsRunningEvent.WaitAsync().ConfigureAwait(false);
+        //            }
+
+        //            _receiveLoopTaskIsRunningEvent = null;
+        //            _sendKeepAliveTaskIsRunningEvent = null;
+        //        })
+        //        .OnExitAsync(() =>
+        //        {
+        //            _receiveLoopCancellationTokenSource?.Cancel();
+        //            _sendKeepAliveLoopCancellationTokenSource?.Cancel();
+        //            _sendKeepAliveResetEvent?.Set();
+        //            return Task.CompletedTask;
+        //        });
+
+        //    _connectionStateMachine.Configure(ConnectionState.LinkError)
+        //        .Permit(ConnectionTrigger.Disconnect, ConnectionState.Disconnected)
+        //        .Permit(ConnectionTrigger.Connected, ConnectionState.Connected)
+        //        .Permit(ConnectionTrigger.Connect, ConnectionState.Connecting)
+        //        .OnEntryFromAsync(ConnectionTrigger.LinkError, async () =>
+        //        {
+        //            await OnDisconnect().ConfigureAwait(false);
+        //        });
+        //}
+
+        private async Task SendKeepAliveLoopAsync(AsyncAutoResetEvent sendKeepAliveResetEvent, CancellationToken cancellationToken)
         {
             try
             {
-                _sendKeepAliveResetEvent = new AsyncAutoResetEvent(false);
+                //_sendKeepAliveResetEvent = new AsyncAutoResetEvent(false);
 
-                if (_sendKeepAliveLoopCancellationTokenSource != null)
-                {
-                    _sendKeepAliveLoopCancellationTokenSource.Dispose();
-                    _sendKeepAliveLoopCancellationTokenSource = null;
-                }
+                //if (_sendKeepAliveLoopCancellationTokenSource != null)
+                //{
+                //    _sendKeepAliveLoopCancellationTokenSource.Dispose();
+                //    _sendKeepAliveLoopCancellationTokenSource = null;
+                //}
 
-                _sendKeepAliveLoopCancellationTokenSource = new CancellationTokenSource();
+                //_sendKeepAliveLoopCancellationTokenSource = new CancellationTokenSource();
 
                 _sendKeepAliveTaskIsRunningEvent.Set();
 
@@ -143,22 +322,25 @@ namespace TransactTcp
 
                 while (true)
                 {
-                    if (!await _sendKeepAliveResetEvent.WaitAsync(_connectionSettings.KeepAliveMilliseconds))
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (!await sendKeepAliveResetEvent.WaitAsync(_connectionSettings.KeepAliveMilliseconds, cancellationToken).ConfigureAwait(false))
                     {
-                        _sendKeepAliveLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
 
                         await ServiceRef.CallAndWaitAsync(this, async () =>
                         {
-                            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
+                            if (State == ConnectionState.Connected && IsStreamConnected)
                             {
-                                await _sendingStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, _sendKeepAliveLoopCancellationTokenSource.Token);
+                                await _sendingStream.WriteAsync(_keepAlivePacket, 0, _keepAlivePacket.Length, cancellationToken).ConfigureAwait(false);
                             }
-                        });
+                        }).ConfigureAwait(false);
                     }
                 }
             }
             catch (OperationCanceledException)
             {
+                System.Diagnostics.Debug.WriteLine($"{GetType()} SendKeepAliveLoop Cancelled");
             }
 #if DEBUG
             catch (Exception ex)
@@ -171,10 +353,12 @@ namespace TransactTcp
                 //_sendKeepAliveLoopCancellationTokenSource = null;
                 //_sendKeepAliveResetEvent = null;
 
-                ServiceRef.Call(this, async () =>
+                ServiceRef.Call(this, () =>
                 {
-                    if (_connectionStateMachine.State == ConnectionState.Connected)
-                        await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
+                    if (State == ConnectionState.Connected)
+                        //await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError).ConfigureAwait(false);
+                        SetState(ConnectionTrigger.LinkError);
+
                 });
             }
             finally
@@ -186,41 +370,47 @@ namespace TransactTcp
 
         private readonly byte[] _messageSizeBuffer = new byte[4];
 
-        private async Task ReceiveLoopAsync()
+        private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
         {
 #pragma warning disable IDE0068 // Use recommended dispose pattern
             var refToThis = ServiceRef.Create<IConnection>(this);
 #pragma warning restore IDE0068 // Use recommended dispose pattern
             try
             {
-                if (_receiveLoopCancellationTokenSource != null)
-                {
-                    _receiveLoopCancellationTokenSource.Dispose();
-                    _receiveLoopCancellationTokenSource = null;
-                }
+                //if (_receiveLoopCancellationTokenSource != null)
+                //{
+                //    _receiveLoopCancellationTokenSource.Dispose();
+                //    _receiveLoopCancellationTokenSource = null;
+                //}
 
-                _receiveLoopCancellationTokenSource = new CancellationTokenSource();
+                //_receiveLoopCancellationTokenSource = new CancellationTokenSource();
                 _receiveLoopTaskIsRunningEvent.Set();
 
-                var cancellationToken = _receiveLoopCancellationTokenSource.Token;
+                //var cancellationToken = _receiveLoopCancellationTokenSource.Token;
                 while (true)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await _receivingStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken);
+                    int messageLength = -1;
+                    if (_messageFramingEnabled)
+                    {
+                        await _receivingStream.ReadBufferedAsync(_messageSizeBuffer, cancellationToken).ConfigureAwait(false);
 
-                    var messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
-                    if (messageLength == 0)
-                        continue;
+                        messageLength = BitConverter.ToInt32(_messageSizeBuffer, 0);
+                        if (messageLength == 0)
+                            continue;
 
-                    cancellationToken.ThrowIfCancellationRequested();
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
 
                     if (messageLength == -1)
                     {
                         if (_receivedActionStreamAsync != null)
                         {
-                            await ServiceRef.CallAndWaitAsync(this, async () =>
-                                await _receivedActionStreamAsync(refToThis, _receivingStream, cancellationToken));
+                            //await ServiceRef.CallAndWaitAsync(this, () =>
+                            //    _receivedActionStreamAsync(refToThis, _receivingStream, cancellationToken)).ConfigureAwait(false);
+                            await _receivedActionStreamAsync(refToThis, _receivingStream, cancellationToken);
+
                         }
                         else
                         {
@@ -235,18 +425,18 @@ namespace TransactTcp
                             var bufferedStream = new NetworkBufferedReadStream(_receivingStream, messageLength);
 #pragma warning restore IDE0067 // Dispose objects before losing scope
                             await ServiceRef.CallAndWaitAsync(this, async () =>
-                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken));
-                            await bufferedStream.FlushAsync();
+                                await _receivedActionStreamAsync(refToThis, bufferedStream, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
+                            await bufferedStream.FlushAsync().ConfigureAwait(false);
                         }
                         else
                         {
                             var messageBuffer = new byte[messageLength];
 
-                            await _receivingStream.ReadBufferedAsync(messageBuffer, cancellationToken);
+                            await _receivingStream.ReadBufferedAsync(messageBuffer, cancellationToken).ConfigureAwait(false);
 
                             if (_receivedActionAsync != null)
                                 await ServiceRef.CallAndWaitAsync(this, async () =>
-                                    await _receivedActionAsync(refToThis, messageBuffer, cancellationToken));
+                                    await _receivedActionAsync(refToThis, messageBuffer, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
                             else //if (_receivedAction != null)
                                 ServiceRef.CallAndWait(this, () => _receivedAction(refToThis, messageBuffer));
                         }
@@ -255,6 +445,7 @@ namespace TransactTcp
             }
             catch (OperationCanceledException)
             {
+                System.Diagnostics.Debug.WriteLine($"{GetType()} ReceiveLoopAsync Cancelled");
             }
 #if DEBUG
             catch (Exception ex)
@@ -266,10 +457,10 @@ namespace TransactTcp
 #endif
                 //_receiveLoopCancellationTokenSource = null;
 
-                ServiceRef.Call(this, async () =>
+                ServiceRef.Call(this, () =>
                 {
-                    if (_connectionStateMachine.State == ConnectionState.Connected)
-                        await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
+                    if (State == ConnectionState.Connected)
+                        SetState(ConnectionTrigger.LinkError);
                 });
             }
             finally
@@ -282,14 +473,14 @@ namespace TransactTcp
         {
             if (_receiveLoopTask != null)
             {
-                if (_sendKeepAliveLoopTask == null)
-                    _receiveLoopTask.Wait();
-                else
-                    Task.WaitAll(_receiveLoopTask, _sendKeepAliveLoopTask);
+                //if (_sendKeepAliveLoopTask == null)
+                //    await _receiveLoopTask.ConfigureAwait(false);
+                //else
+                //    await Task.WhenAll(_receiveLoopTask, _sendKeepAliveLoopTask).ConfigureAwait(false);
                 //System.Diagnostics.Debug.Assert(_receiveLoopCancellationTokenSource == null);
                 //System.Diagnostics.Debug.Assert(_sendKeepAliveLoopCancellationTokenSource == null);
-                _receiveLoopTask.Dispose();
-                _sendKeepAliveLoopTask?.Dispose();
+                //_receiveLoopTask?.Dispose();
+                //_sendKeepAliveLoopTask?.Dispose();
                 _receiveLoopTask = null;
                 _sendKeepAliveLoopTask = null;
             }
@@ -302,43 +493,41 @@ namespace TransactTcp
         protected abstract bool IsStreamConnected { get; }
 
         protected void BeginConnection()
-            => Task.Run(OnConnectAsyncCore);
+            => Task.Run(()=>ConnectAsyncCore((_connectCancellationTokenSource = new CancellationTokenSource()).Token));
 
-        private async Task OnConnectAsyncCore()
+        protected async Task ConnectAsyncCore(CancellationToken cancellationToken)
         {
             try
             {
-                if (_connectCancellationTokenSource != null)
-                {
-                    _connectCancellationTokenSource.Dispose();
-                    _connectCancellationTokenSource = null;
-                }
+                await OnConnectAsync(cancellationToken).ConfigureAwait(false);
 
-                _connectCancellationTokenSource = new CancellationTokenSource();
-
-                await OnConnectAsync(_connectCancellationTokenSource.Token);
-
-                _connectCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
 
                 System.Diagnostics.Debug.Assert(_connectedStream != null, "Connected stream must be not null here!");
 
                 if (_connectionSettings.UseBufferedStream)
                 {
-                    _sendingStream = new NetworkWriteStream(new BufferedStream(_connectedStream));
-                    _receivingStream = new NetworkReadStream(new BufferedStream(_connectedStream));
+                    //_sendingStream = new NetworkWriteStream(new BufferedStream(_connectedStream));
+                    //_receivingStream = new NetworkReadStream(new BufferedStream(_connectedStream));
+                    _sendingStream = new BufferedStream(_connectedStream);
+                    _receivingStream = new BufferedStream(_connectedStream);
                 }
                 else
                 {
-                    _sendingStream = new NetworkWriteStream(_connectedStream);
-                    _receivingStream = new NetworkReadStream(_connectedStream);
+                    //_sendingStream = new NetworkWriteStream(_connectedStream);
+                    //_receivingStream = new NetworkReadStream(_connectedStream);
+                    _sendingStream = _connectedStream;
+                    _receivingStream = _connectedStream;
                 }
 
                 ServiceRef.Call(this, async () =>
                 {
-                    if (_connectionStateMachine.State == ConnectionState.Connecting ||
-                        _connectionStateMachine.State == ConnectionState.LinkError)
+                    if (State == ConnectionState.Connecting ||
+                        State == ConnectionState.LinkError)
                     {
-                        await _connectionStateMachine.FireAsync(ConnectionTrigger.Connected);
+                        //await SetStateAsync(ConnectionTrigger.Connected).ConfigureAwait(false);
+                        await RunConnection();
+                        SetState(ConnectionTrigger.Connected);
                     }
                 });
             }
@@ -353,10 +542,10 @@ namespace TransactTcp
             catch (Exception)
             {
 #endif
-                ServiceRef.Call(this, async () =>
+                ServiceRef.Call(this, () =>
                 {
-                    if (_connectionStateMachine.State == ConnectionState.Connecting)
-                        await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
+                    if (State == ConnectionState.Connecting)
+                        SetState(ConnectionTrigger.LinkError);
                 });
             }
             finally
@@ -366,7 +555,7 @@ namespace TransactTcp
 
         protected abstract Task OnConnectAsync(CancellationToken cancellationToken);
 
-        public ConnectionState State { get => _connectionStateMachine.State; }
+        //public ConnectionState State { get => _connectionStateMachine.State; }
 
         public async Task SendDataAsync(byte[] data, CancellationToken cancellationToken)
         {
@@ -375,7 +564,7 @@ namespace TransactTcp
                 throw new ArgumentNullException(nameof(data));
             }
 
-            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
+            if (State == ConnectionState.Connected && IsStreamConnected)
             {
                 _sendKeepAliveResetEvent?.Set();
 
@@ -383,22 +572,18 @@ namespace TransactTcp
 
                 try
                 {
-                    //if (_connectionSettings.UseBufferedStream)
-                    //{
-                    //    _sendingStream?.Write(lenInBytes, 0, 4);
-                    //    _sendingStream?.Write(data, 0, data.Length);
-                    //    await _sendingStream?.FlushAsync(cancellationToken);
-                    //}
-                    //else
-                    //{
-                    await _sendingStream?.WriteAsync(lenInBytes, 0, 4, cancellationToken);
-                    await _sendingStream?.WriteAsync(data, 0, data.Length, cancellationToken);
-                    await _sendingStream?.FlushAsync(cancellationToken);
+                    if (_messageFramingEnabled)
+                    {
+                        await _sendingStream.WriteAsync(lenInBytes, 0, 4, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    await _sendingStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
+                    await _sendingStream.FlushAsync(cancellationToken).ConfigureAwait(false);
                     //}
                 }
                 catch (Exception)
                 {
-                    await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
+                    SetState(ConnectionTrigger.LinkError);
                 }
             }
         }
@@ -408,21 +593,13 @@ namespace TransactTcp
 #if NETSTANDARD2_1
         public async Task SendDataAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
         {
-            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
+            if (State == ConnectionState.Connected && IsStreamConnected)
             {
                 _sendKeepAliveResetEvent?.Set();
 
                 try
                 {
-                    //if (_connectionSettings.UseBufferedStream)
-                    //{
-                    //    var lenInBytes = BitConverter.GetBytes(data.Length);
-                    //    _sendingStream?.Write(lenInBytes, 0, 4);
-                    //    _sendingStream?.Write(data.ToArray());
-                    //    await _sendingStream?.FlushAsync();
-                    //}
-                    //else
-                    //{
+                    
                     using var memoryBufferOwner = MemoryPool<byte>.Shared.Rent(4);
 
                     if (!BitConverter.TryWriteBytes(memoryBufferOwner.Memory.Span, data.Length))
@@ -430,9 +607,13 @@ namespace TransactTcp
                         throw new InvalidOperationException();
                     }
 
-                    await _sendingStream?.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask();
-                    await _sendingStream?.WriteAsync(data, cancellationToken).AsTask();
-                    await _sendingStream?.FlushAsync();
+                    if (_messageFramingEnabled)
+                    {
+                        await _sendingStream.WriteAsync(memoryBufferOwner.Memory.Slice(0, 4), cancellationToken).AsTask().ConfigureAwait(false);
+                    }
+
+                    await _sendingStream.WriteAsync(data, cancellationToken).AsTask().ConfigureAwait(false);
+                    await _sendingStream.FlushAsync().ConfigureAwait(false);
                     //}
                 }
 #if DEBUG
@@ -443,7 +624,7 @@ namespace TransactTcp
                 catch (Exception)
                 {
 #endif
-                    await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
+                    SetState(ConnectionTrigger.LinkError);
                 }
             }
         }
@@ -456,23 +637,19 @@ namespace TransactTcp
                 throw new ArgumentNullException(nameof(sendFunction));
             }
 
-            if (_connectionStateMachine.State == ConnectionState.Connected && IsStreamConnected)
+            if (State == ConnectionState.Connected && IsStreamConnected)
             {
                 _sendKeepAliveResetEvent?.Set();
 
                 try
                 {
-                    //if (_connectionSettings.UseBufferedStream)
-                    //{
-                    _sendingStream?.Write(_nullLength, 0, 4);
-                    //    await sendFunction(_sendingStream, cancellationToken);
-                    //    await _sendingStream.FlushAsync();
-                    //}
-                    //else
-                    //{
-                    //await _sendingStream?.WriteAsync(_nullLength, 0, 4, cancellationToken);
-                    await sendFunction(_sendingStream, cancellationToken);
-                    await _sendingStream?.FlushAsync();
+                    if (_messageFramingEnabled)
+                    {
+                        await _sendingStream.WriteAsync(_nullLength, 0, 4).ConfigureAwait(false);
+                    }
+
+                    await sendFunction(_sendingStream, cancellationToken).ConfigureAwait(false);
+                    //await _sendingStream.FlushAsync().ConfigureAwait(false);
                     //}
                 }
 #if DEBUG
@@ -483,7 +660,7 @@ namespace TransactTcp
                 catch (Exception)
                 {
 #endif
-                    await _connectionStateMachine.FireAsync(ConnectionTrigger.LinkError);
+                    SetState(ConnectionTrigger.LinkError);
                 }
             }
         }
@@ -503,13 +680,13 @@ namespace TransactTcp
             }
 
             _connectionStateChangedAction = connectionStateChangedAction ?? _connectionStateChangedAction;
-            _connectionStateMachine.Fire(ConnectionTrigger.Connect);
+            SetState(ConnectionTrigger.Connect);
         }
 
         public virtual void Stop()
         {
-            if (_connectionStateMachine.State != ConnectionState.Disconnected)
-                _connectionStateMachine.Fire(ConnectionTrigger.Disconnect);
+            if (State != ConnectionState.Disconnected)
+                SetState(ConnectionTrigger.Disconnect);
         }
 
         #region IDisposable Support
@@ -522,6 +699,7 @@ namespace TransactTcp
                 if (disposing)
                 {
                     Stop();
+
                     _connectCancellationTokenSource?.Dispose();
                     _connectCancellationTokenSource = null;
                     _sendKeepAliveLoopCancellationTokenSource?.Dispose();

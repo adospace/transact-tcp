@@ -34,47 +34,45 @@ namespace TransactTcp
                 throw new InvalidOperationException();
             }
 
-            _listeningTask = Task.Run(ListeningLoopCore);
+            _listeningTask = Task.Run(()=> 
+            ListeningLoopCore((_listeningLoopCancellationTokenSource = new CancellationTokenSource()).Token));
         }
 
-        private async Task ListeningLoopCore()
+        private async Task ListeningLoopCore(CancellationToken cancellationToken)
         {
             var tcpListener = new TcpListener(_localEndPoint);
             try
             {
                 tcpListener.Start(_settings.BackLog);
 
-                _listeningLoopCancellationTokenSource = new CancellationTokenSource();
+                while (true)
                 {
-                    while (true)
+                    using (cancellationToken.Register(() => tcpListener.Stop()))
                     {
-                        using (_listeningLoopCancellationTokenSource.Token.Register(() => tcpListener.Stop()))
+                        try
                         {
-                            try
-                            {
-                                var tcpToClient = await tcpListener.AcceptTcpClientAsync();
+                            var tcpToClient = await tcpListener.AcceptTcpClientAsync();
 
-                                _connectionCreatedAction.Invoke(this,
-                                    ServiceRef.Create<IConnection>(new TcpServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
-                            }
-#if DEBUG
-                            catch (InvalidOperationException ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
-#else
-                            catch (InvalidOperationException)
-                            {
-#endif
-                                _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
-                                throw;
-                            }
-                            finally
-                            {
-                            }
+                            _connectionCreatedAction.Invoke(this,
+                                ServiceRef.Create<IConnection>(new TcpServerPeerConnection(tcpToClient, _settings.NewConnectionSettings)));
                         }
-
-                        _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
+#if DEBUG
+                        catch (InvalidOperationException ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"{GetType()}{Environment.NewLine}{ex}");
+#else
+                        catch (InvalidOperationException)
+                        {
+#endif
+                            cancellationToken.ThrowIfCancellationRequested();
+                            throw;
+                        }
+                        finally
+                        {
+                        }
                     }
+
+                    _listeningLoopCancellationTokenSource.Token.ThrowIfCancellationRequested();
                 }
             }
             catch (OperationCanceledException)
@@ -98,7 +96,7 @@ namespace TransactTcp
         {
             _listeningLoopCancellationTokenSource?.Cancel();
             _listeningLoopCancellationTokenSource = null;
-            _listeningTask?.Wait();
+            //_listeningTask?.Wait();
             _listeningTask = null;
         }
 

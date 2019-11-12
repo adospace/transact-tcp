@@ -107,7 +107,7 @@ namespace TransactTcp
             if (toState == ConnectionState.Connected)
                 //even if only one connection is connected I'm connected
                 _connectionStateMachine.Fire(ConnectionTrigger.Connected);
-            else if (toState == ConnectionState.LinkError)
+            else if (toState == ConnectionState.LinkError && State != ConnectionState.LinkError)
                 //check if all connections are down
                 if (_connections.Except(new[] { connection }).All(_ => _.State == ConnectionState.LinkError))
                     _connectionStateMachine.Fire(ConnectionTrigger.LinkError);

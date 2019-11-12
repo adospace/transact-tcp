@@ -19,8 +19,11 @@ namespace TransactTcp
             NamedPipeServerStream streamIn, 
             NamedPipeServerStream streamOut,
             ConnectionSettings connectionSettings = null) 
-            : base(connectionSettings ?? new ServerConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
+            : base(false, connectionSettings ?? new ServerConnectionSettings(keepAliveMilliseconds: 0 /*by default named pipe does't require keep alive messages*/))
         {
+            if (_connectionSettings.UseBufferedStream)
+                throw new NotSupportedException();
+
             _streamIn = streamIn;
             _streamOut = streamOut;
         }
@@ -29,7 +32,7 @@ namespace TransactTcp
 
         protected override Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            _connectedStream = new NamedPipeConnectedStream(_streamIn, _streamOut);
+            _connectedStream = new NamedPipeConnectedStream($"{GetType()}", "", _streamIn, "", _streamOut);
 
             return Task.CompletedTask;
         }

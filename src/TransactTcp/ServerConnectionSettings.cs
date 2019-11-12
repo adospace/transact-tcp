@@ -6,7 +6,8 @@ namespace TransactTcp
 {
     public class ServerConnectionSettings : ConnectionSettings
     {
-        public ServerConnectionSettings(int keepAliveMilliseconds = 500,
+        public ServerConnectionSettings(
+            int keepAliveMilliseconds = 500,
             int connectionTimeoutMilliseconds = 10000,
             bool useBufferedStream = false)
             : base(keepAliveMilliseconds, useBufferedStream)

@@ -14,7 +14,7 @@ namespace TransactTcp
         private readonly TcpClient _tcpToClient;
 
         public TcpServerPeerConnection(TcpClient tcpToClient, ConnectionSettings connectionSettings = null) 
-            : base(connectionSettings)
+            : base(true, connectionSettings)
         {
             _tcpToClient = tcpToClient;
         }

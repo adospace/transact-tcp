@@ -18,7 +18,7 @@ namespace TransactTcp
 
         public TcpServerConnection(
            TcpConnectionEndPoint connectionEndPoint) 
-            : base(connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings())
+            : base(true, connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings())
         {
             _serverConnectionSettings = (ServerConnectionSettings) _connectionSettings;
             _localEndPoint = connectionEndPoint.LocalEndPoint ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPoint");
@@ -59,6 +59,7 @@ namespace TransactTcp
                 catch (Exception)
                 {
 #endif
+                    throw;
                 }
                 finally
                 {
@@ -78,8 +79,18 @@ namespace TransactTcp
                     new CancellationTokenSource(_serverConnectionSettings.ConnectionTimeoutMilliseconds);
 
                 timeoutCancellationTokenSource.Token.Register(() => tcpListener.Stop());
+                
+                try
+                {
+                    _tcpToClient = await tcpListener.AcceptTcpClientAsync();
+                }
+                catch (ObjectDisposedException)
+                {
+                    if (timeoutCancellationTokenSource.IsCancellationRequested)
+                        throw new InvalidOperationException("Accept connection cancelled");
 
-                _tcpToClient = await tcpListener.AcceptTcpClientAsync();
+                    throw;
+                }
             }
             else // if (State == ConnectionState.LinkError)
             {
@@ -98,6 +109,12 @@ namespace TransactTcp
 
             _tcpToClient?.Close();
             _tcpToClient = null;
+
+        }
+
+        protected override void SetState(ConnectionTrigger connectionTrigger)
+        {
+            base.SetState(connectionTrigger);
 
             if (State == ConnectionState.LinkError)
                 BeginConnection();

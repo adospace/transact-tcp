@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Nito.AsyncEx;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -20,7 +21,7 @@ namespace TransactTcp
 
         public TcpClientConnection(
             TcpConnectionEndPoint connectionEndPoint)
-            : base(connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings())
+            : base(true, connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings())
         {
             _clientConnectionSettings = (ClientConnectionSettings) _connectionSettings;
             _remoteEndPoint = connectionEndPoint.RemoteEndPoint ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPoint));
@@ -31,21 +32,21 @@ namespace TransactTcp
 
         protected override async Task OnConnectAsync(CancellationToken cancellationToken)
         {
-            _tcpClient = _localEndPoint == null ? new TcpClient() : new TcpClient(_localEndPoint);
+            System.Diagnostics.Debug.WriteLine($"{GetType()} OnConnectAsync");
+            var tcpClient = _localEndPoint == null ? new TcpClient() : new TcpClient(_localEndPoint);
             var cancellationCompletionSource = new TaskCompletionSource<bool>();
 
-            using var reconnectionDelayEvent = new AutoResetEvent(false);
+            var reconnectionDelayEvent = new AsyncAutoResetEvent();
             while (true)
             {
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var connectTask = _tcpClient.ConnectAsync(_remoteEndPoint.Address, _remoteEndPoint.Port);
+                    var connectTask = tcpClient.ConnectAsync(_remoteEndPoint.Address, _remoteEndPoint.Port);
 
                     using (cancellationToken.Register(() =>
                     {
-                        reconnectionDelayEvent.Set();
                         cancellationCompletionSource.TrySetResult(true);
                     }))
                     {
@@ -57,17 +58,17 @@ namespace TransactTcp
 
                     if (!connectTask.IsFaulted)
                     {
+                        _tcpClient = tcpClient;
                         _connectedStream = await CreateConnectedStreamAsync(_tcpClient, cancellationToken);
-
                         break;
                     }
 
-                    if (_connectionStateMachine.State == ConnectionState.Connecting)
+                    if (State == ConnectionState.Connecting)
                     {
                         throw new SocketException();
                     }
 
-                    if (reconnectionDelayEvent.WaitOne(_clientConnectionSettings.ReconnectionDelayMilliseconds))
+                    if (await reconnectionDelayEvent.WaitAsync(_clientConnectionSettings.ReconnectionDelayMilliseconds, cancellationToken))
                         break;
                 }
                 catch (OperationCanceledException)
@@ -84,12 +85,17 @@ namespace TransactTcp
 
         protected override void OnDisconnect()
         {
+            System.Diagnostics.Debug.WriteLine($"{GetType()} OnDisconnect");
             base.OnDisconnect();
 
             _tcpClient?.Close();
-            _tcpClient = null;
+        }
 
-            if (State == ConnectionState.LinkError && _clientConnectionSettings.AutoReconnect)
+        protected override void SetState(ConnectionTrigger connectionTrigger)
+        {
+            base.SetState(connectionTrigger);
+
+            if (State == ConnectionState.LinkError)
                 BeginConnection();
         }
     }
