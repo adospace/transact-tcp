@@ -526,8 +526,9 @@ namespace TransactTcp
                         State == ConnectionState.LinkError)
                     {
                         //await SetStateAsync(ConnectionTrigger.Connected).ConfigureAwait(false);
-                        await RunConnection();
                         SetState(ConnectionTrigger.Connected);
+
+                        await RunConnection();
                     }
                 });
             }
