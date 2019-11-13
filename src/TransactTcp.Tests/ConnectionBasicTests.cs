@@ -161,9 +161,9 @@ namespace TransactTcp.Tests
         [TestMethod]
         public void ClientShouldMoveStateToLinkErrorIfServerDoesntExist()
         {
-            var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15005);
             using var connectionLinkErrorEvent = new AutoResetEvent(false);
             using var connectionOkEvent = new AutoResetEvent(false);
+            using var client = TcpConnectionFactory.CreateClient(IPAddress.Loopback, 15005);
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -185,9 +185,9 @@ namespace TransactTcp.Tests
         [TestMethod]
         public void NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist()
         {
-            using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist");
             using var connectionLinkErrorEvent = new AutoResetEvent(false);
             using var connectionOkEvent = new AutoResetEvent(false);
+            using var client = NamedPipeConnectionFactory.CreateClient("NamedPipeClientShouldMoveStateToLinkErrorIfServerDoesntExist");
 
             client.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
@@ -209,10 +209,10 @@ namespace TransactTcp.Tests
         [TestMethod]
         public void ServerShouldMoveStateToLinkErrorIfClientDoesntConnect()
         {
-            var server = TcpConnectionFactory.CreateServer(15006, new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
             using var connectionLinkErrorEvent = new AutoResetEvent(false);
             using var connectionOkEvent = new AutoResetEvent(false);
 
+            using var server = TcpConnectionFactory.CreateServer(15006, new ServerConnectionSettings(connectionTimeoutMilliseconds: 1000));
             server.Start(connectionStateChangedAction: (connection, fromState, toState) =>
             {
                 if (toState == ConnectionState.LinkError)

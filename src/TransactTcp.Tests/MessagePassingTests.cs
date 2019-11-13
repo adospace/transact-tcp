@@ -399,8 +399,8 @@ namespace TransactTcp.Tests
                 newConnection.Start(
                     receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
                     {
-                        using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
-                        var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
+                        using var memoryOwner = MemoryPool<byte>.Shared.Rent(4);
+                        var buffer = memoryOwner.Memory.Slice(0, 4);
                         await stream.ReadAsync(buffer, cancellationToken);
                         var pingString = Encoding.UTF8.GetString(buffer.Span);
                         await connection.SendDataAsync(
@@ -415,8 +415,8 @@ namespace TransactTcp.Tests
             client.Start(
                 receivedActionStreamAsync: async (connection, stream, cancellationToken) =>
                 {
-                    using var memoryOwner = MemoryPool<byte>.Shared.Rent((int)stream.Length);
-                    var buffer = memoryOwner.Memory.Slice(0, (int)stream.Length);
+                    using var memoryOwner = MemoryPool<byte>.Shared.Rent(21);
+                    var buffer = memoryOwner.Memory.Slice(0, 21);
                     await stream.ReadAsync(buffer, cancellationToken);
                     if (Encoding.UTF8.GetString(buffer.Span) == "SERVER RECEIVED: PING")
                         receivedBackFromServerEvent.Set();

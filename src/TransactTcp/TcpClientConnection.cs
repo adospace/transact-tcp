@@ -21,7 +21,8 @@ namespace TransactTcp
 
         public TcpClientConnection(
             TcpConnectionEndPoint connectionEndPoint)
-            : base(true, connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings())
+            : base((connectionEndPoint?.ConnectionSettings?.EnableMessageFraming).GetValueOrDefault(true),
+                  connectionEndPoint?.ConnectionSettings ?? new ClientConnectionSettings())
         {
             _clientConnectionSettings = (ClientConnectionSettings) _connectionSettings;
             _remoteEndPoint = connectionEndPoint.RemoteEndPoint ?? throw new ArgumentNullException(nameof(connectionEndPoint.RemoteEndPoint));

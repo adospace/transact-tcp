@@ -18,7 +18,8 @@ namespace TransactTcp
 
         public TcpServerConnection(
            TcpConnectionEndPoint connectionEndPoint) 
-            : base(true, connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings())
+            : base((connectionEndPoint?.ConnectionSettings?.EnableMessageFraming).GetValueOrDefault(true),
+                  connectionEndPoint?.ConnectionSettings ?? new ServerConnectionSettings())
         {
             _serverConnectionSettings = (ServerConnectionSettings) _connectionSettings;
             _localEndPoint = connectionEndPoint.LocalEndPoint ?? throw new ArgumentNullException("connectionEndPoint.LocalEndPoint");

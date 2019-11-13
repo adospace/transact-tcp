@@ -21,7 +21,8 @@ namespace TransactTcp
         /// <param name="autoReconnect">Enable/disable automatic re-connection to server</param>
         public ConnectionSettings(
             int keepAliveMilliseconds = 500,
-            bool useBufferedStream = false
+            bool useBufferedStream = false,
+            bool enableMessageFraming = true
             )
         {
             if (keepAliveMilliseconds < 0) //->0 to disable keep alive
@@ -31,6 +32,7 @@ namespace TransactTcp
 
             KeepAliveMilliseconds = keepAliveMilliseconds;
             UseBufferedStream = useBufferedStream;
+            EnableMessageFraming = enableMessageFraming;
         }
 
         /// <summary>
@@ -39,8 +41,15 @@ namespace TransactTcp
         public int KeepAliveMilliseconds { get; }
 
         /// <summary>
-        /// Indicates if connected strema should be wrapped with a <see cref="System.IO.BufferedStream"/> (False by default)
+        /// Indicates if connected stream should be wrapped with a <see cref="System.IO.BufferedStream"/> (False by default)
         /// </summary>
         public bool UseBufferedStream { get; }
+
+        /// <summary>
+        /// Indicates if connection should automatically manage the message framing
+        /// </summary>
+        /// <remarks>Note that both peer should consistent <see cref="EnableMessageFraming"/> setting (both either true or false).
+        /// Named pipe transport doesn't support mesage framing and this settings doesn't have effect.</remarks>
+        public bool EnableMessageFraming { get; }
     }
 }
