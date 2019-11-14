@@ -47,6 +47,7 @@ namespace TransactTcp
         {
             _messageFramingEnabled = messageFramingEnabled;
             _connectionSettings = connectionSettings ?? new ConnectionSettings();
+
             //            _connectionStateMachine = new StateMachine<ConnectionState, ConnectionTrigger>(ConnectionState.Disconnected);
 
             //            _connectionStateMachine.OnTransitionedAsync((transition) =>
@@ -81,7 +82,7 @@ namespace TransactTcp
             _receiveLoopTask = Task.Run(()
                 => ReceiveLoopAsync((_receiveLoopCancellationTokenSource = new CancellationTokenSource()).Token));
 
-            if (_connectionSettings.KeepAliveMilliseconds > 0)
+            if (_messageFramingEnabled && _connectionSettings.KeepAliveMilliseconds > 0)
             {
                 _sendKeepAliveLoopTask = Task.Run(() => SendKeepAliveLoopAsync(
                     _sendKeepAliveResetEvent = new AsyncAutoResetEvent(false),
@@ -90,7 +91,7 @@ namespace TransactTcp
 
             await _receiveLoopTaskIsRunningEvent.WaitAsync().ConfigureAwait(false);
 
-            if (_connectionSettings.KeepAliveMilliseconds > 0)
+            if (_messageFramingEnabled && _connectionSettings.KeepAliveMilliseconds > 0)
             {
                 await _sendKeepAliveTaskIsRunningEvent.WaitAsync().ConfigureAwait(false);
             }

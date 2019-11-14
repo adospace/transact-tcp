@@ -49,7 +49,8 @@ namespace TransactTcp
         /// Indicates if connection should automatically manage the message framing
         /// </summary>
         /// <remarks>Note that both peer should consistent <see cref="EnableMessageFraming"/> setting (both either true or false).
-        /// Named pipe transport doesn't support mesage framing and this settings doesn't have effect.</remarks>
+        /// Named pipe transport doesn't support mesage framing and this settings doesn't have effect.
+        /// Disabling mesage framing also disable keep alive management.</remarks>
         public bool EnableMessageFraming { get; }
     }
 }

@@ -171,6 +171,10 @@ namespace TransactTcp.Tests
                     connectionLinkErrorEvent.Set();
                 else if (toState == ConnectionState.Connected)
                     connectionOkEvent.Set();
+            },
+            receivedActionStreamAsync: (connection, stream, cancellationToken) => {
+                System.Diagnostics.Debug.Assert(false);
+                return Task.CompletedTask;
             });
 
             connectionLinkErrorEvent.WaitOne(10000).ShouldBeTrue();
