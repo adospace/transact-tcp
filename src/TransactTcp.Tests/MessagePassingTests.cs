@@ -135,14 +135,13 @@ namespace TransactTcp.Tests
         {
             var toxiproxyServerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TransactTcp.Tests", "toxiproxy-server-windows-amd64.exe");
 
+            foreach (var existentToxiserverProcess in Process.GetProcessesByName("toxiproxy-server-windows-amd64").ToList())
+                existentToxiserverProcess.Kill();
+
             Directory.CreateDirectory(Path.GetDirectoryName(toxiproxyServerPath));
 
             await File.WriteAllBytesAsync(toxiproxyServerPath,
                 Utils.LoadResourceAsByteArray("toxiproxy-server-windows-amd64.exe"));
-
-            foreach (var existentToxiserverProcess in Process.GetProcessesByName("toxiproxy-server-windows-amd64.exe").ToList())
-                existentToxiserverProcess.Kill();
-
 
             using var toxyproxyServerProcess = Process.Start(toxiproxyServerPath);
 
